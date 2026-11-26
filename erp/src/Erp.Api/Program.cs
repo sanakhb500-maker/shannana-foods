@@ -5,7 +5,9 @@ using Erp.Api.Security;
 using Erp.Application.Common;
 using Erp.Application.Validators;
 using Erp.Domain.Common;
+using Erp.Application.Inventory;
 using Erp.Infrastructure.Auth;
+using Erp.Infrastructure.Inventory;
 using Erp.Infrastructure.Identity;
 using Erp.Infrastructure.Persistence;
 using FluentValidation;
@@ -28,6 +30,7 @@ var connectionString = cfg.GetConnectionString("Default")
 // ---------- services ----------
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(connectionString));
 
 builder.Services.AddIdentityCore<AppUser>(o =>
@@ -86,7 +89,7 @@ builder.Services.AddRateLimiter(o =>
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
     o.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
         ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(15), QueueLimit = 0 }));
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = cfg.GetValue("RateLimit:LoginPermitLimit", 10), Window = TimeSpan.FromMinutes(15), QueueLimit = 0 }));
 });
 
 builder.Services.AddValidatorsFromAssemblyContaining<CurrencyValidator>();
@@ -108,9 +111,18 @@ var app = builder.Build();
 app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
 {
     var ex = ctx.Features.Get<IExceptionHandlerFeature>()?.Error;
-    app.Logger.LogError(ex, "Unhandled exception for {Path}", ctx.Request.Path);
-    ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
-    await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail("Unexpected server error."));
+    // Expected, business-level failures keep their message; everything else is a generic 500.
+    var (status, message) = ex switch
+    {
+        BusinessRuleException b => (StatusCodes.Status400BadRequest, b.Message),
+        NotFoundException n => (StatusCodes.Status404NotFound, n.Message),
+        ConcurrencyConflictException c => (StatusCodes.Status409Conflict, c.Message),
+        _ => (StatusCodes.Status500InternalServerError, "Unexpected server error."),
+    };
+    if (status == StatusCodes.Status500InternalServerError)
+        app.Logger.LogError(ex, "Unhandled exception for {Path}", ctx.Request.Path);
+    ctx.Response.StatusCode = status;
+    await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail(message));
 }));
 
 app.UseDefaultFiles();

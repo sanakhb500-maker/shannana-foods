@@ -1,0 +1,320 @@
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Observable } from 'rxjs';
+import { Api, parseApiError } from '../core/api';
+import { Auth } from '../core/auth';
+import { I18n } from '../core/i18n';
+import { Lookups } from '../core/lookups';
+import { DocStatus, Paged, Transfer, TransferRow, WRITE_ROLES } from '../core/models';
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+/** Warehouse-to-warehouse transfers: draft, edit, confirm (posts stock) or cancel (reverses it). */
+@Component({
+  selector: 'app-transfers-page',
+  imports: [FormsModule],
+  template: `
+    <header class="page-head">
+      <h1>{{ i18n.t('nav.transfers') }}</h1>
+      <div class="page-tools">
+        <select class="input" [(ngModel)]="status" (ngModelChange)="reload()">
+          <option value="">{{ i18n.t('inv.allStatuses') }}</option>
+          @for (s of statuses; track s) {
+            <option [value]="s">{{ i18n.t('status.' + s) }}</option>
+          }
+        </select>
+        @if (canWrite) {
+          <button class="btn primary" type="button" (click)="openNew()">+ {{ i18n.t('inv.newTransfer') }}</button>
+        } @else {
+          <span class="badge muted">{{ i18n.t('common.readOnly') }}</span>
+        }
+      </div>
+    </header>
+
+    @if (message() && !doc()) {
+      <div class="alert error">{{ message() }}</div>
+    }
+
+    <div class="card table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>{{ i18n.t('inv.number') }}</th>
+            <th>{{ i18n.t('f.date') }}</th>
+            <th>{{ i18n.t('inv.from') }}</th>
+            <th>{{ i18n.t('inv.to') }}</th>
+            <th class="num">{{ i18n.t('inv.lines') }}</th>
+            <th>{{ i18n.t('common.status') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of rows(); track r.id) {
+            <tr class="clickable" (click)="open(r.id)">
+              <td>{{ r.number }}</td>
+              <td>{{ r.date }}</td>
+              <td>{{ lookups.warehouseLabel(r.fromWarehouseId) }}</td>
+              <td>{{ lookups.warehouseLabel(r.toWarehouseId) }}</td>
+              <td class="num">{{ r.lineCount }}</td>
+              <td><span class="badge" [class.ok]="r.status === 'Confirmed'" [class.muted]="r.status === 'Cancelled'">{{ i18n.t('status.' + r.status) }}</span></td>
+            </tr>
+          } @empty {
+            <tr><td class="empty" colspan="6">{{ i18n.t(loading() ? 'common.loading' : 'common.empty') }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="pager">
+      <span>{{ i18n.t('common.total') }}: {{ total() }}</span>
+      <span class="spacer"></span>
+      <button class="btn sm" type="button" [disabled]="page() <= 1" (click)="go(-1)">{{ i18n.t('common.prev') }}</button>
+      <span>{{ page() }} / {{ pages() }}</span>
+      <button class="btn sm" type="button" [disabled]="page() >= pages()" (click)="go(1)">{{ i18n.t('common.next') }}</button>
+    </footer>
+
+    @if (doc(); as d) {
+      <div class="modal-backdrop" (click)="close()">
+        <form class="modal wide-modal card" (click)="$event.stopPropagation()" (ngSubmit)="save()" novalidate>
+          <h2>
+            {{ i18n.t('nav.transfers') }} {{ d.number ?? '' }}
+            <span class="badge" [class.ok]="d.status === 'Confirmed'" [class.muted]="d.status === 'Cancelled'">{{ i18n.t('status.' + d.status) }}</span>
+          </h2>
+
+          @if (message()) {
+            <div class="alert error">{{ message() }}</div>
+          }
+
+          <div class="form-grid">
+            <div class="field">
+              <label for="t-date">{{ i18n.t('f.date') }} <span class="req">*</span></label>
+              <input id="t-date" class="input" type="date" name="date" [(ngModel)]="d.date" [disabled]="!editable()" />
+            </div>
+            <div class="field">
+              <label for="t-notes">{{ i18n.t('inv.notes') }}</label>
+              <input id="t-notes" class="input" name="notes" [(ngModel)]="d.notes" maxlength="500" [disabled]="!editable()" />
+            </div>
+            <div class="field">
+              <label for="t-from">{{ i18n.t('inv.from') }} <span class="req">*</span></label>
+              <select id="t-from" class="input" name="from" [(ngModel)]="d.fromWarehouseId" [disabled]="!editable()">
+                <option [ngValue]="null" disabled>{{ i18n.t('common.select') }}</option>
+                @for (w of warehouseChoices(d.fromWarehouseId); track w.id) {
+                  <option [ngValue]="w.id">{{ lookups.warehouseLabel(w.id) }}</option>
+                }
+              </select>
+            </div>
+            <div class="field">
+              <label for="t-to">{{ i18n.t('inv.to') }} <span class="req">*</span></label>
+              <select id="t-to" class="input" name="to" [(ngModel)]="d.toWarehouseId" [disabled]="!editable()">
+                <option [ngValue]="null" disabled>{{ i18n.t('common.select') }}</option>
+                @for (w of warehouseChoices(d.toWarehouseId); track w.id) {
+                  <option [ngValue]="w.id">{{ lookups.warehouseLabel(w.id) }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <h3 class="sub">{{ i18n.t('inv.lines') }}</h3>
+          <div class="table-wrap lines">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>{{ i18n.t('f.item') }}</th>
+                  <th class="num">{{ i18n.t('inv.quantity') }}</th>
+                  @if (editable()) { <th></th> }
+                </tr>
+              </thead>
+              <tbody>
+                @for (l of d.lines; track $index; let i = $index) {
+                  <tr>
+                    <td>
+                      <select class="input" [name]="'item' + i" [(ngModel)]="l.itemId" [disabled]="!editable()">
+                        <option [ngValue]="0" disabled>{{ i18n.t('common.select') }}</option>
+                        @for (it of itemChoices(l.itemId); track it.id) {
+                          <option [ngValue]="it.id">{{ lookups.itemLabel(it.id) }}</option>
+                        }
+                      </select>
+                    </td>
+                    <td class="num">
+                      <input class="input qty" type="number" step="0.0001" min="0" [name]="'qty' + i" [(ngModel)]="l.quantity" [disabled]="!editable()" />
+                    </td>
+                    @if (editable()) {
+                      <td class="actions"><button class="btn sm danger" type="button" (click)="removeLine(i)" [attr.aria-label]="i18n.t('common.remove')">✕</button></td>
+                    }
+                  </tr>
+                } @empty {
+                  <tr><td class="empty" colspan="3">{{ i18n.t('inv.noLines') }}</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (editable()) {
+            <button class="btn sm" type="button" (click)="addLine()">+ {{ i18n.t('inv.addLine') }}</button>
+          }
+
+          <div class="modal-actions">
+            <button class="btn" type="button" (click)="close()">{{ i18n.t('common.close') }}</button>
+            @if (canWrite && d.status === 'Draft') {
+              <button class="btn" type="button" [disabled]="busy()" (click)="cancelDoc()">{{ i18n.t('inv.cancelDoc') }}</button>
+              <button class="btn" type="submit" [disabled]="busy()">{{ i18n.t('common.save') }}</button>
+              <button class="btn primary" type="button" [disabled]="busy()" (click)="confirm()">{{ i18n.t('inv.confirm') }}</button>
+            }
+            @if (canWrite && d.status === 'Confirmed') {
+              <button class="btn danger" type="button" [disabled]="busy()" (click)="cancelDoc()">{{ i18n.t('inv.reverse') }}</button>
+            }
+          </div>
+        </form>
+      </div>
+    }
+  `,
+})
+export class TransfersPage implements OnInit {
+  private readonly api = inject(Api);
+  private readonly auth = inject(Auth);
+  readonly i18n = inject(I18n);
+  readonly lookups = inject(Lookups);
+
+  readonly canWrite = this.auth.hasAnyRole(WRITE_ROLES.inventory);
+  readonly statuses: DocStatus[] = ['Draft', 'Confirmed', 'Cancelled'];
+  readonly rows = signal<TransferRow[]>([]);
+  readonly total = signal(0);
+  readonly page = signal(1);
+  readonly pages = computed(() => Math.max(1, Math.ceil(this.total() / 20)));
+  readonly loading = signal(false);
+  readonly message = signal('');
+  readonly doc = signal<Transfer | null>(null);
+  readonly busy = signal(false);
+  status = '';
+
+  readonly editable = computed(() => this.canWrite && this.doc()?.status === 'Draft');
+
+  ngOnInit(): void {
+    this.lookups.ensureLoaded();
+    this.load();
+  }
+
+  /** Active warehouses, plus the currently selected one even if it was deactivated since. */
+  warehouseChoices(selected: number | null) {
+    return this.lookups.warehouses().filter((w) => w.isActive || w.id === selected);
+  }
+
+  itemChoices(selected: number) {
+    return this.lookups.items().filter((i) => i.isActive || i.id === selected);
+  }
+
+  reload(): void {
+    this.page.set(1);
+    this.load();
+  }
+
+  go(d: number): void {
+    this.page.update((p) => Math.min(this.pages(), Math.max(1, p + d)));
+    this.load();
+  }
+
+  private load(): void {
+    this.loading.set(true);
+    this.api.get<Paged<TransferRow>>(`stocktransfers?page=${this.page()}&pageSize=20${this.status ? '&status=' + this.status : ''}`).subscribe({
+      next: (r) => {
+        this.rows.set(r.items);
+        this.total.set(r.total);
+        this.loading.set(false);
+      },
+      error: (e) => {
+        this.message.set(parseApiError(e).message);
+        this.loading.set(false);
+      },
+    });
+  }
+
+  openNew(): void {
+    this.message.set('');
+    this.doc.set({ date: today(), fromWarehouseId: null, toWarehouseId: null, status: 'Draft', notes: null, lines: [{ itemId: 0, quantity: null }] });
+  }
+
+  open(id: number): void {
+    this.message.set('');
+    this.api.get<Transfer>(`stocktransfers/${id}`).subscribe({
+      next: (t) => this.doc.set(t),
+      error: (e) => this.message.set(parseApiError(e).message),
+    });
+  }
+
+  close(): void {
+    this.doc.set(null);
+  }
+
+  addLine(): void {
+    this.doc()?.lines.push({ itemId: 0, quantity: null });
+  }
+
+  removeLine(i: number): void {
+    this.doc()?.lines.splice(i, 1);
+  }
+
+  private body() {
+    const d = this.doc()!;
+    return {
+      date: d.date,
+      fromWarehouseId: d.fromWarehouseId ?? 0,
+      toWarehouseId: d.toWarehouseId ?? 0,
+      notes: d.notes?.trim() || null,
+      lines: d.lines.map((l) => ({ itemId: l.itemId, quantity: Number(l.quantity ?? 0) })),
+    };
+  }
+
+  /** Runs an API call against the open document, showing errors in the dialog. */
+  private run(call: () => Observable<Transfer>, closeAfter = false): void {
+    this.busy.set(true);
+    this.message.set('');
+    call().subscribe({
+      next: (t) => {
+        this.busy.set(false);
+        if (closeAfter) this.doc.set(null);
+        else this.doc.set(t);
+        this.load();
+      },
+      error: (e) => {
+        const p = parseApiError(e);
+        const detail = Object.values(p.fields).flat().join(' ');
+        this.message.set(detail ? `${p.message} ${detail}` : p.message);
+        this.busy.set(false);
+      },
+    });
+  }
+
+  save(): void {
+    if (!this.editable()) return;
+    const d = this.doc()!;
+    this.run(() => (d.id ? this.api.update<Transfer>('stocktransfers', d.id, this.body()) : this.api.create<Transfer>('stocktransfers', this.body())));
+  }
+
+  /** Saves the draft first, then posts it to stock. */
+  confirm(): void {
+    const d = this.doc()!;
+    this.busy.set(true);
+    this.message.set('');
+    const save$ = d.id ? this.api.update<Transfer>('stocktransfers', d.id, this.body()) : this.api.create<Transfer>('stocktransfers', this.body());
+    save$.subscribe({
+      next: (saved) => {
+        this.busy.set(false);
+        this.doc.set(saved);
+        this.run(() => this.api.post<Transfer>(`stocktransfers/${saved.id}/confirm`));
+      },
+      error: (e) => {
+        this.message.set(parseApiError(e).message);
+        this.busy.set(false);
+      },
+    });
+  }
+
+  cancelDoc(): void {
+    const d = this.doc()!;
+    if (!d.id) {
+      this.close();
+      return;
+    }
+    const q = d.status === 'Confirmed' ? 'inv.confirmReverse' : 'inv.confirmCancel';
+    if (!confirm(this.i18n.t(q))) return;
+    this.run(() => this.api.post<Transfer>(`stocktransfers/${d.id}/cancel`));
+  }
+}

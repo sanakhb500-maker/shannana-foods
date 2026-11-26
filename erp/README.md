@@ -9,7 +9,7 @@ Standalone from the public website (`backend/` + `frontend/`): own database, own
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Foundation + master data (auth, roles, items, units, warehouses, suppliers, customers, drivers, vehicles, currencies, rates, users) | done |
-| 2 | Inventory and warehouses | planned |
+| 2 | Inventory and warehouses (stock balances, movement ledger, transfers, count/opening/write-off adjustments, low-stock, valuation) | done |
 | 3 | Purchasing | planned |
 | 4 | Sales and distribution | planned |
 | 5 | Accounting | planned |
@@ -45,9 +45,21 @@ Single-origin build (what production uses): `cd web && npx ng build` writes into
 | `Jwt:Key` | JWT signing secret, **32+ chars, required** (the app refuses to start without it) |
 | `Database:AutoMigrate` | `true` to migrate + seed at startup outside Development |
 | `Seed:AdminEmail` / `Seed:AdminPassword` | first admin, created only when no users exist |
+| `Inventory:AllowNegativeStock` | `false` by default: an issue/transfer that would take stock below zero is rejected |
+| `RateLimit:LoginPermitLimit` | failed+successful logins allowed per IP per 15 minutes (default 10) |
 | `Seed:LocalCurrencyCode` | local (base) currency, default `JOD`; **fixed after the first run** |
 
 For production set these through environment variables (`Jwt__Key`, `ConnectionStrings__Default`, ...) or user-secrets, never in committed files.
+
+## Inventory rules (phase 2)
+- **Ledger first.** `StockMovement` is append-only (+in / -out, with unit cost); `StockBalance` (quantity + moving-average cost per item and warehouse) is maintained in the same transaction.
+- **Documents** (transfers, adjustments) are `Draft -> Confirmed -> Cancelled`. Only confirming touches stock; drafts are freely editable.
+- **Confirm is atomic**: movements, balances and status commit together or not at all. Balances carry a row-version, so two simultaneous postings to the same stock cannot both succeed (the loser gets a 409/400).
+- **Costing**: moving average. Receiving blends the cost; issuing uses the current average; a transfer carries the source cost to the destination.
+- **Adjustments** state the *counted* quantity; the difference from the system quantity is posted at confirm time (surplus at the stated cost, else current average, else the item's standard cost).
+- **Cancelling a confirmed document** posts reversal movements. It is refused if the stock has since been used (e.g. already transferred on).
+- Items and warehouses that still hold stock cannot be deactivated.
+- Document numbers are id-based (`TRF-000123`, `ADJ-000045`), unique but not guaranteed gap-free.
 
 ## Auth and roles
 JWT in an HttpOnly cookie (`erp_auth`) plus a double-submit CSRF token (`erp_csrf` cookie echoed in `X-CSRF-Token`) on writes.

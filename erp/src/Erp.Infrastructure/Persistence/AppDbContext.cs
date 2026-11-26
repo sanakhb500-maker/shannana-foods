@@ -25,6 +25,14 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
     public DbSet<Driver> Drivers => Set<Driver>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
 
+    // inventory
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
+    public DbSet<StockTransferLine> StockTransferLines => Set<StockTransferLine>();
+    public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
+    public DbSet<StockAdjustmentLine> StockAdjustmentLines => Set<StockAdjustmentLine>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -128,6 +136,67 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
             e.HasIndex(x => x.PlateNumber).IsUnique();
             e.Property(x => x.PlateNumber).HasMaxLength(20);
             e.Property(x => x.Description).HasMaxLength(200);
+        });
+
+        ConfigureInventory(b);
+    }
+
+    private static void ConfigureInventory(ModelBuilder b)
+    {
+        b.Entity<StockBalance>(e =>
+        {
+            e.HasIndex(x => new { x.ItemId, x.WarehouseId }).IsUnique();
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<StockMovement>(e =>
+        {
+            e.HasIndex(x => new { x.ItemId, x.WarehouseId, x.Date });
+            e.HasIndex(x => new { x.DocumentType, x.DocumentId });
+            e.Property(x => x.DocumentType).HasMaxLength(30);
+            e.Property(x => x.DocumentNumber).HasMaxLength(30);
+            e.Property(x => x.CreatedBy).HasMaxLength(256);
+            e.Property(x => x.Type).HasConversion<int>();
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<StockMovement>().WithMany().HasForeignKey(x => x.ReversalOfId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<StockTransfer>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.FromWarehouseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.ToWarehouseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.StockTransferId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_StockTransfer_Warehouses", "[FromWarehouseId] <> [ToWarehouseId]"));
+        });
+
+        b.Entity<StockTransferLine>(e =>
+        {
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_StockTransferLine_Qty", "[Quantity] > 0"));
+        });
+
+        b.Entity<StockAdjustment>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.Property(x => x.Reason).HasConversion<int>();
+            e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.StockAdjustmentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<StockAdjustmentLine>(e =>
+        {
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_StockAdjustmentLine_Counted", "[CountedQuantity] >= 0"));
         });
     }
 

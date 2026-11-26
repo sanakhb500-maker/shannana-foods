@@ -41,4 +41,36 @@ export const WRITE_ROLES = {
   suppliers: ['Admin', 'Purchasing', 'Accountant'],
   customers: ['Admin', 'Sales', 'Accountant'],
   fleet: ['Admin', 'Dispatcher'],
+  inventory: ['Admin', 'StoreKeeper'],
 } as const satisfies Record<string, readonly string[]>;
+
+// ---------- inventory ----------
+export type DocStatus = 'Draft' | 'Confirmed' | 'Cancelled';
+export type AdjustmentReason = 'Count' | 'Opening' | 'Damage' | 'Other';
+
+export interface LookupItem { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean; reorderLevel?: number }
+export interface LookupWarehouse { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean }
+
+export interface BalanceRow {
+  itemId: number; itemCode: string; itemNameAr: string; itemNameEn: string;
+  warehouseId: number; warehouseCode: string; warehouseNameAr: string; warehouseNameEn: string;
+  quantity: number; averageCost: number; value: number;
+}
+export interface BalancesResult { items: BalanceRow[]; total: number; page: number; pageSize: number; totalValue: number }
+
+export interface MovementRow {
+  id: number; date: string; itemId: number; itemCode: string; itemNameAr: string; itemNameEn: string;
+  warehouseId: number; warehouseCode: string; warehouseNameAr: string; warehouseNameEn: string;
+  quantity: number; unitCost: number; value: number; type: string;
+  documentType: string; documentId: number; documentNumber: string | null; createdAt: string; createdBy: string | null;
+}
+
+export interface LowStockRow { itemId: number; itemCode: string; itemNameAr: string; itemNameEn: string; reorderLevel: number; totalQuantity: number }
+
+export interface TransferRow { id: number; number: string | null; date: string; fromWarehouseId: number; toWarehouseId: number; status: DocStatus; notes: string | null; lineCount: number }
+export interface TransferLine { itemId: number; quantity: number | null }
+export interface Transfer { id?: number; number?: string | null; date: string; fromWarehouseId: number | null; toWarehouseId: number | null; status: DocStatus; notes: string | null; lines: TransferLine[] }
+
+export interface AdjustmentRow { id: number; number: string | null; date: string; warehouseId: number; reason: AdjustmentReason; status: DocStatus; notes: string | null; lineCount: number }
+export interface AdjustmentLine { itemId: number; countedQuantity: number | null; unitCost: number | null; systemQuantity?: number | null; difference?: number | null }
+export interface Adjustment { id?: number; number?: string | null; date: string; warehouseId: number | null; reason: AdjustmentReason; status: DocStatus; notes: string | null; lines: AdjustmentLine[] }

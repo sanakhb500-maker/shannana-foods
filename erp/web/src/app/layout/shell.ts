@@ -24,6 +24,11 @@ interface NavItem {
             <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
           }
 
+          <div class="nav-group">{{ i18n.t('nav.inventory') }}</div>
+          @for (n of inventory; track n.path) {
+            <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
+          }
+
           @if (auth.hasAnyRole(['Admin'])) {
             <div class="nav-group">{{ i18n.t('nav.admin') }}</div>
             <a routerLink="/users" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t('nav.users') }}</a>
@@ -63,6 +68,14 @@ export class Shell {
     { path: '/vehicles', label: 'nav.vehicles' },
     { path: '/currencies', label: 'nav.currencies' },
     { path: '/rates', label: 'nav.rates' },
+  ];
+
+  readonly inventory: NavItem[] = [
+    { path: '/stock', label: 'nav.stockBalances' },
+    { path: '/stock-movements', label: 'nav.stockMovements' },
+    { path: '/low-stock', label: 'nav.lowStock' },
+    { path: '/transfers', label: 'nav.transfers' },
+    { path: '/adjustments', label: 'nav.adjustments' },
   ];
 
   toggleTheme(): void {

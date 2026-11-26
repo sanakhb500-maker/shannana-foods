@@ -84,6 +84,11 @@ public class ItemsController(AppDbContext db, IValidator<Item> v, IAuthorization
             return "Category not found or inactive.";
         return null;
     }
+
+    // An item that still has stock on hand cannot be switched off.
+    protected override async Task<string?> BeforeDeactivateAsync(Item i, CancellationToken ct) =>
+        await Db.StockBalances.AnyAsync(b => b.ItemId == i.Id && b.Quantity != 0, ct)
+            ? "This item still has stock on hand. Adjust it to zero first." : null;
 }
 
 public class WarehousesController(AppDbContext db, IValidator<Warehouse> v, IAuthorizationService a)
@@ -94,6 +99,11 @@ public class WarehousesController(AppDbContext db, IValidator<Warehouse> v, IAut
     protected override IQueryable<Warehouse> Search(IQueryable<Warehouse> q, string t) =>
         q.Where(x => x.Code.Contains(t) || x.NameAr.Contains(t) || x.NameEn.Contains(t));
     protected override Task<string?> BeforeSaveAsync(Warehouse w, Warehouse? e, CancellationToken ct) { w.Code = w.Code.ToUpperInvariant(); return Task.FromResult<string?>(null); }
+
+    // A warehouse that still holds stock cannot be switched off.
+    protected override async Task<string?> BeforeDeactivateAsync(Warehouse w, CancellationToken ct) =>
+        await Db.StockBalances.AnyAsync(b => b.WarehouseId == w.Id && b.Quantity != 0, ct)
+            ? "This warehouse still holds stock. Transfer or adjust it to zero first." : null;
 }
 
 public class SuppliersController(AppDbContext db, IValidator<Supplier> v, IAuthorizationService a)

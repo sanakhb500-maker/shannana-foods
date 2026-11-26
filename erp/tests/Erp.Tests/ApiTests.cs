@@ -18,6 +18,7 @@ public class ErpFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development"); // brings dev Jwt key + seeded admin from appsettings.Development.json
+        builder.UseSetting("RateLimit:LoginPermitLimit", "10000"); // every test logs in; the limiter itself is exercised in production only
         builder.ConfigureServices(s =>
         {
             s.RemoveAll<DbContextOptions<AppDbContext>>();
