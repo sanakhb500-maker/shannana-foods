@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="{{lang}}" dir="{{dir}}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  {{{head.seo}}}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/forms.css">
+  <link rel="stylesheet" href="/css/i18n.css">
+  <link rel="stylesheet" href="/css/cart.css">
+  <script src="/js/boot.js"></script>
+</head>
+
+<body>
+  <header class="site-header" id="header">
+    <div class="container">
+      <div class="nav-wrap">
+        <a class="brand" href="#home" aria-label="{{brand.aria}}">
+          <img src="/img/shannana-logo.png" alt="{{brand.logoAlt}}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+          <span class="brand-fallback">{{brand.name}}</span>
+        </a>
+
+        <nav class="nav" aria-label="{{nav.aria}}">
+          <a href="#home">{{nav.home}}</a>
+          <a href="#about">{{nav.about}}</a>
+          <a href="#products">{{nav.products}}</a>
+          <a href="#why">{{nav.why}}</a>
+          <a href="#b2b">{{nav.b2b}}</a>
+          <a href="#contact">{{nav.contact}}</a>
+        </nav>
+
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;">
+          <div class="lang-switch lang-header" role="group" aria-label="{{lang.aria}}"><a class="lang-opt{{lang.cls.ar}}" href="{{lang.href.ar}}" lang="ar" hreflang="ar"{{{lang.cur.ar}}} data-lang-link>العربية</a><a class="lang-opt{{lang.cls.en}}" href="{{lang.href.en}}" lang="en" hreflang="en"{{{lang.cur.en}}} data-lang-link>English</a></div>
+          <a class="header-cta" href="https://wa.me/963985034031" target="_blank" rel="noopener">{{nav.cta}}</a>
+          <button class="cart-toggle" id="cartToggle" type="button" aria-label="{{cart.open}}" aria-haspopup="dialog" aria-controls="sfCartDialog">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.2 11.1a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+            <span class="cart-count" data-cart-count hidden>0</span>
+          </button>
+          <button class="menu-btn" id="menuBtn" aria-label="{{nav.menu}}" aria-expanded="false">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="mobile-panel" id="mobilePanel">
+        <a href="#home">{{nav.home}}</a>
+        <a href="#about">{{nav.about}}</a>
+        <a href="#products">{{nav.products}}</a>
+        <a href="#why">{{nav.why}}</a>
+        <a href="#b2b">{{nav.b2b}}</a>
+        <a href="#contact">{{nav.contact}}</a>
+        <a href="https://wa.me/963985034031" target="_blank" rel="noopener">{{nav.cta}}</a>
+        <div class="lang-switch lang-mobile" role="group" aria-label="{{lang.aria}}"><a class="lang-opt{{lang.cls.ar}}" href="{{lang.href.ar}}" lang="ar" hreflang="ar"{{{lang.cur.ar}}} data-lang-link>العربية</a><a class="lang-opt{{lang.cls.en}}" href="{{lang.href.en}}" lang="en" hreflang="en"{{{lang.cur.en}}} data-lang-link>English</a></div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="container hero-grid">
+        <div class="hero-copy reveal">
+          <span class="eyebrow">{{hero.eyebrow}}</span>
+          <h1>{{{hero.title}}}</h1>
+          <p class="hero-lead">{{hero.lead}}</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#products">{{hero.browse}}</a>
+            <a class="btn btn-secondary" href="#b2b">{{hero.b2b}}</a>
+          </div>
+          <div class="hero-note">{{hero.note}}</div>
+        </div>
+
+        <div class="hero-visual reveal">
+          <div class="hero-card">
+            <div class="floating-chip chip-a">{{hero.chipA}}</div>
+            <div class="floating-chip chip-b">{{{hero.chipB}}}</div>
+            <img class="hero-product" src="/img/HeroProduct.png" alt="{{hero.imgAlt}}" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="trust-strip" aria-label="{{marquee.aria}}">
+      <div class="marquee" aria-hidden="true">
+        <div class="marquee-group">
+          <span class="marquee-item">{{marquee.1}}</span><span class="marquee-item">{{marquee.2}}</span><span class="marquee-item">{{marquee.3}}</span><span class="marquee-item">{{marquee.4}}</span><span class="marquee-item">{{marquee.5}}</span><span class="marquee-item">{{marquee.6}}</span><span class="marquee-item">{{marquee.7}}</span>
+        </div>
+        <div class="marquee-group">
+          <span class="marquee-item">{{marquee.1}}</span><span class="marquee-item">{{marquee.2}}</span><span class="marquee-item">{{marquee.3}}</span><span class="marquee-item">{{marquee.4}}</span><span class="marquee-item">{{marquee.5}}</span><span class="marquee-item">{{marquee.6}}</span><span class="marquee-item">{{marquee.7}}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section about-section" id="about" aria-labelledby="aboutTitle">
+      <div class="container about-grid">
+        <div class="about-copy">
+          <div class="section-kicker">{{about.kicker}}</div>
+          <h2 id="aboutTitle">{{about.title}}</h2>
+          <p class="about-lead">{{about.intro}}</p>
+          <p>{{about.activity}}</p>
+          <p>{{about.focus}}</p>
+          <p class="about-signature">{{about.signature}}</p>
+          <a class="btn btn-secondary" href="#products">{{about.cta}}</a>
+        </div>
+
+        <div class="about-visual" aria-label="{{about.visualAria}}">
+          <div class="about-art">
+            <div class="about-art-orbit about-art-orbit-one" aria-hidden="true"></div>
+            <div class="about-art-orbit about-art-orbit-two" aria-hidden="true"></div>
+            <div class="about-year">
+              <strong>2025</strong>
+              <span>{{about.founded}}</span>
+            </div>
+            <img class="about-logo" src="/img/shannana-logo.png" alt="{{brand.logoAlt}}" loading="lazy">
+            <div class="about-art-caption">{{about.visualCaption}}</div>
+            <div class="about-activities" aria-label="{{about.activitiesAria}}">
+              <span>{{about.manufacturing}}</span>
+              <span>{{about.distribution}}</span>
+              <span>{{about.export}}</span>
+            </div>
+            <div class="about-origin">
+              <span>{{about.headquarters}}</span>
+              <strong>{{about.syria}}</strong>
+              <small>{{about.currentMarket}}: {{about.syrianMarket}}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section product-section" id="products">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">{{products.kicker}}</div>
+            <h2>{{products.title}}</h2>
+            <p class="section-intro">{{products.intro}}</p>
+            <div class="filters" id="filters" aria-label="{{products.filtersAria}}"></div>
+          </div>
+          <div class="product-head-actions">
+            <a
+              class="btn btn-primary"
+              id="viewAllProducts"
+              href="?catalog=all#products"
+              data-label-all="{{products.viewAll}}"
+              data-label-featured="{{products.viewFeatured}}"
+            >
+              {{products.viewAll}}
+            </a>
+            <button class="btn btn-secondary" type="button" data-open-form="inquiry">{{products.inquiryBtn}}</button>
+          </div>
+        </div>
+        <div class="products-grid" id="productsGrid"></div>
+      </div>
+    </section>
+
+    <section class="section why-section" id="why">
+      <div class="container">
+        <div class="section-head">
+          <div>
+            <div class="section-kicker">{{why.kicker}}</div>
+            <h2>{{why.title}}</h2>
+            <p class="section-intro">{{why.intro}}</p>
+          </div>
+        </div>
+
+        <div class="why-grid">
+          <div class="why-panel">
+            <div class="why-list">
+              <article class="why-item">
+                <div class="why-icon">01</div>
+                <div><h3>{{why.1.title}}</h3><p>{{why.1.text}}</p></div>
+              </article>
+              <article class="why-item">
+                <div class="why-icon">02</div>
+                <div><h3>{{why.2.title}}</h3><p>{{why.2.text}}</p></div>
+              </article>
+              <article class="why-item">
+                <div class="why-icon">03</div>
+                <div><h3>{{why.3.title}}</h3><p>{{why.3.text}}</p></div>
+              </article>
+            </div>
+          </div>
+
+          <aside class="quote-card">
+            <div>
+              <div class="mini">{{why.quote.mini}}</div>
+              <h3>{{why.quote.title}}</h3>
+              <p>{{why.quote.text}}</p>
+            </div>
+            <div class="quote-stats">
+              <div class="quote-stat"><b>{{why.stat.1}}</b></div>
+              <div class="quote-stat"><b>{{why.stat.2}}</b></div>
+              <div class="quote-stat"><b>{{why.stat.3}}</b></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section class="b2b" id="b2b">
+      <div class="container">
+        <div class="b2b-box reveal">
+          <div>
+            <h3>{{b2b.title}}</h3>
+            <p>{{b2b.text}}</p>
+          </div>
+          <div class="b2b-actions"><button class="btn btn-primary" type="button" data-open-form="distribution">{{b2b.send}}</button><a class="btn btn-secondary" href="https://wa.me/963985034031?text={{url:b2b.waMessage}}" target="_blank" rel="noopener">{{b2b.wa}}</a></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="contact">
+    <div class="container footer-main">
+      <div>
+        <img class="footer-logo" src="/img/shannana-logo.png" alt="{{footer.logoAlt}}" onerror="this.style.display='none'">
+        <p>{{footer.about}}</p>
+        <div class="socials">
+          <a href="#" aria-label="{{footer.fb}}">f</a>
+          <a href="#" aria-label="{{footer.ig}}">◎</a>
+          <a href="https://wa.me/963985034031" target="_blank" rel="noopener" aria-label="{{footer.wa}}">◔</a>
+        </div>
+      </div>
+      <div>
+        <h4>{{footer.quick}}</h4>
+        <ul><li><a href="#home">{{nav.home}}</a></li><li><a href="#about">{{nav.about}}</a></li><li><a href="#products">{{nav.products}}</a></li><li><a href="#why">{{nav.why}}</a></li><li><a href="#b2b">{{footer.link.b2b}}</a></li></ul>
+      </div>
+      <div>
+        <h4>{{footer.cats}}</h4>
+        <ul><li>{{footer.cat.1}}</li><li>{{footer.cat.2}}</li><li>{{footer.cat.3}}</li><li>{{footer.cat.4}}</li></ul>
+      </div>
+      <div>
+        <h4>{{nav.contact}}</h4>
+        <ul><li>{{footer.address}}</li><li dir="ltr">+963 985 034 031</li><li dir="ltr">info@shanana-foods.com</li><li><button class="link-btn" type="button" data-open-form="inquiry">{{footer.inquiry}}</button></li></ul>
+      </div>
+    </div>
+    <div class="container footer-bottom"><span>{{footer.copy}}</span></div>
+  </footer>
+
+  <!-- Public inquiry dialog -->
+  <dialog class="sf-dlg" id="inquiryDlg" aria-labelledby="inquiryTitle">
+    <form class="sf-form" data-form="inquiry" novalidate>
+      <div class="sf-head"><h3 id="inquiryTitle">{{fi.title}}</h3><button class="sf-x" type="button" data-close aria-label="{{f.closeAria}}">×</button></div>
+      <p class="sf-lead">{{fi.lead}}</p>
+      <div class="sf-body">
+        <div class="sf-alert" role="alert" aria-live="polite" hidden></div>
+        <input type="hidden" name="formToken" value="">
+        <div class="sf-hp" aria-hidden="true"><label for="inq_website">{{f.hp}}</label><input id="inq_website" name="website" tabindex="-1" autocomplete="off"></div>
+        <div class="sf-grid">
+          <div class="sf-field" data-field="name"><label for="inq_name">{{fi.name}}</label><input id="inq_name" name="name" autocomplete="name" maxlength="100" required><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="phone"><label for="inq_phone">{{fi.phone}} <small>{{fi.orEmail}}</small></label><input id="inq_phone" name="phone" type="tel" dir="ltr" autocomplete="tel" maxlength="30" placeholder="+963…"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="email"><label for="inq_email">{{f.email}} <small>{{f.optional}}</small></label><input id="inq_email" name="email" type="email" dir="ltr" autocomplete="email" maxlength="254"><div class="sf-err"></div></div>
+        </div>
+        <div class="sf-field" data-field="message"><label for="inq_message">{{fi.message}}</label><textarea id="inq_message" name="message" rows="4" minlength="5" maxlength="2000" required placeholder="{{fi.placeholder}}"></textarea><div class="sf-err"></div></div>
+      </div>
+      <div class="sf-foot"><span class="sf-note">{{fi.note}}</span><button class="btn btn-primary" type="submit">{{fi.submit}}</button></div>
+    </form>
+    <div class="sf-done" hidden>
+      <div class="tick" aria-hidden="true">✓</div><h3>{{fi.doneTitle}}</h3><p>{{fi.doneText}}</p><button class="btn btn-primary" type="button" data-close>{{f.close}}</button>
+    </div>
+  </dialog>
+
+  <!-- Distribution request dialog -->
+  <dialog class="sf-dlg" id="distributionDlg" aria-labelledby="distributionTitle">
+    <form class="sf-form" data-form="distribution" novalidate>
+      <div class="sf-head"><h3 id="distributionTitle">{{fd.title}}</h3><button class="sf-x" type="button" data-close aria-label="{{f.closeAria}}">×</button></div>
+      <p class="sf-lead">{{fd.lead}}</p>
+      <div class="sf-body">
+        <div class="sf-alert" role="alert" aria-live="polite" hidden></div>
+        <input type="hidden" name="formToken" value="">
+        <div class="sf-hp" aria-hidden="true"><label for="dist_website">{{f.hp}}</label><input id="dist_website" name="website" tabindex="-1" autocomplete="off"></div>
+        <div class="sf-grid">
+          <div class="sf-field" data-field="name"><label for="dist_name">{{fd.name}}</label><input id="dist_name" name="name" autocomplete="name" maxlength="100" required><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="businessName"><label for="dist_business">{{fd.business}}</label><input id="dist_business" name="businessName" autocomplete="organization" maxlength="150" required><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="phone"><label for="dist_phone">{{fd.phone}}</label><input id="dist_phone" name="phone" type="tel" dir="ltr" autocomplete="tel" maxlength="30" required placeholder="+963…"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="whatsapp"><label for="dist_whatsapp">{{fd.whatsapp}} <small>{{f.optional}}</small></label><input id="dist_whatsapp" name="whatsapp" type="tel" dir="ltr" maxlength="30" placeholder="+963…"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="email"><label for="dist_email">{{f.email}} <small>{{f.optional}}</small></label><input id="dist_email" name="email" type="email" dir="ltr" autocomplete="email" maxlength="254"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="businessType"><label for="dist_type">{{fd.type}}</label><select id="dist_type" name="businessType" required><option value="">{{fd.choose}}</option><option value="shop">{{bt.shop}}</option><option value="distributor">{{bt.distributor}}</option><option value="wholesaler">{{bt.wholesaler}}</option><option value="restaurant">{{bt.restaurant}}</option><option value="supermarket">{{bt.supermarket}}</option><option value="other">{{bt.other}}</option></select><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="city"><label for="dist_city">{{f.city}} <small>{{f.optional}}</small></label><input id="dist_city" name="city" maxlength="100" autocomplete="address-level2"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="area"><label for="dist_area">{{f.area}} <small>{{f.optional}}</small></label><input id="dist_area" name="area" maxlength="100" autocomplete="address-level3"><div class="sf-err"></div></div>
+        </div>
+        <div class="sf-field" data-field="message"><label for="dist_message">{{fd.details}} <small>{{f.optional}}</small></label><textarea id="dist_message" name="message" rows="3" maxlength="2000" placeholder="{{fd.placeholder}}"></textarea><div class="sf-err"></div></div>
+      </div>
+      <div class="sf-foot"><span class="sf-note">{{fd.note}}</span><button class="btn btn-primary" type="submit">{{fd.submit}}</button></div>
+    </form>
+    <div class="sf-done" hidden>
+      <div class="tick" aria-hidden="true">✓</div><h3>{{fd.doneTitle}}</h3><p>{{fd.doneText}}</p><button class="btn btn-primary" type="button" data-close>{{f.close}}</button>
+    </div>
+  </dialog>
+
+  <script type="application/json" id="sf-i18n">{{{client.json}}}</script>
+  <script src="/js/main.js"></script>
+  <script src="/js/forms.js"></script>
+  <script src="/js/cart.js"></script>
+</body>
+</html>

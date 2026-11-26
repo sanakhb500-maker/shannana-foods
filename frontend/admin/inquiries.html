@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>الاستفسارات | شنانة فودز</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body data-request-kind="inquiries">
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar" aria-label="القائمة الجانبية">
+      <div class="side-brand"><strong>شنانة فودز</strong><span>لوحة الإدارة</span></div>
+      <nav class="side-nav">
+        <a class="nav-item" href="/admin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>
+          لوحة التحكم
+        </a>
+        <a class="nav-item" href="/admin/products">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg>
+          المنتجات
+        </a>
+        <a class="nav-item" href="/admin/categories">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12 12 20l-9-9V3h8l9 9Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>
+          التصنيفات
+        </a>
+<a class="nav-item active" aria-current="page" href="/admin/inquiries"><span class="nav-symbol" aria-hidden="true">✉</span> الاستفسارات</a>
+<a class="nav-item" href="/admin/distribution"><span class="nav-symbol" aria-hidden="true">▣</span> طلبات التوزيع</a>
+      </nav>
+      <div class="side-foot">
+        <a class="nav-item" href="/" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+          عرض الموقع
+        </a>
+        <button class="nav-item" id="logoutBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          تسجيل الخروج
+        </button>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="فتح القائمة" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <h1>الاستفسارات</h1>
+        <div class="user-chip">
+          <div class="who"><b id="userName">…</b><small id="userEmail" dir="ltr"></small></div>
+          <div class="avatar" id="avatar" aria-hidden="true">·</div>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="page-head">
+          <div><h2 class="greeting">إدارة الاستفسارات</h2><p class="greeting-sub">اعرض استفسارات الزوار وحدّث حالتها بعد التواصل معهم.</p></div>
+        </div>
+        <div class="toolbar" role="search">
+          <input id="search" type="search" placeholder="بحث بالاسم أو بيانات التواصل…" maxlength="100" aria-label="بحث" />
+          <select id="statusFilter" aria-label="فلترة حسب الحالة">
+            <option value="all">كل الحالات</option>
+            <option value="new">جديد</option>
+            <option value="contacted">تم التواصل</option>
+            <option value="closed">مغلق</option>
+          </select>
+          <button class="btn btn-primary" id="searchBtn" type="button">بحث</button>
+          <span class="count" id="count" aria-live="polite"></span>
+        </div>
+        <div class="alert" id="pageError" role="alert" hidden></div>
+        <div class="table-wrap">
+          <table class="tbl" id="tbl">
+            <thead><tr><th>صاحب الاستفسار</th><th>التواصل</th><th>عن ماذا؟</th><th>الرسالة</th><th>تاريخ الإرسال</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="empty" id="empty" hidden>لا توجد استفسارات مطابقة.</div>
+          <div class="empty" id="loading">جارٍ التحميل…</div>
+        </div>
+        <div class="pagination" aria-label="التنقل بين الصفحات">
+          <button class="btn btn-ghost sm" id="prevPage" type="button" disabled>السابق</button>
+          <span id="pageInfo" aria-live="polite">الصفحة 1</span>
+          <button class="btn btn-ghost sm" id="nextPage" type="button" disabled>التالي</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="/admin/admin-common.js" defer></script>
+  <script src="/admin/forms-list.js" defer></script>
+</body>
+</html>

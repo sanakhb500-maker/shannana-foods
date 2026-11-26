@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Prisma generated client (re-created by `npm run db:generate`)
+backend/src/generated/
+
+# Logs / tests / build output
+*.log
+npm-debug.log*
+coverage/
+dist/
+
+# Local database files and backups — keep database migrations/source scripts
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.bak
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+# Local phase backups - do not upload
+*.phase*-backup
+*.old

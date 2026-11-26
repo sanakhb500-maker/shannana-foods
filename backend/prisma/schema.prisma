@@ -1,0 +1,323 @@
+// ============================================================================
+// Shannana Foods — Prisma schema (PostgreSQL)
+// PHASE 2 — للمراجعة فقط (لم يُنفَّذ أي migration بعد)
+//
+// اصطلاحات التسمية:
+//   - Models بصيغة PascalCase مفرد (Product)  ←→  جداول snake_case جمع (products)
+//   - حقول Prisma بصيغة camelCase (imageUrl)  ←→  أعمدة snake_case (image_url)
+//   - قيم الـ enums بحروف صغيرة مطابقة تمامًا لقيم الـ API (لا طبقة تحويل)
+// ============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// رابط الاتصال (DATABASE_URL) يُعرَّف في prisma.config.ts وليس هنا (Prisma 7)
+datasource db {
+  provider = "postgresql"
+}
+
+// ----------------------------------------------------------------------------
+// Enums  (تُنشأ كـ native ENUM types في PostgreSQL)
+// ----------------------------------------------------------------------------
+
+enum UserRole {
+  admin
+
+  @@map("user_role")
+}
+
+/// وحدة الوزن/الحجم الصافي للعبوة (g=غرام · kg=كيلوغرام · ml=مل · l=لتر)
+enum ContentUnit {
+  g
+  kg
+  ml
+  l
+
+  @@map("content_unit")
+}
+
+/// وحدة مدة الصلاحية
+enum TimeUnit {
+  day
+  month
+  year
+
+  @@map("time_unit")
+}
+
+/// لون خلفية صورة المنتج في البطاقة (يقابل tone-red / tone-gold / ... في CSS)
+enum ProductTone {
+  red
+  gold
+  rose
+  green
+
+  @@map("product_tone")
+}
+
+enum InquirySource {
+  product
+  contact
+  whatsapp
+
+  @@map("inquiry_source")
+}
+
+enum InquiryStatus {
+  new
+  contacted
+  closed
+
+  @@map("inquiry_status")
+}
+
+/// shop=محل · distributor=موزع · wholesaler=تاجر جملة · restaurant=مطعم
+/// supermarket=سوبرماركت · other=أخرى   (العناوين العربية في الواجهة فقط)
+enum BusinessType {
+  shop
+  distributor
+  wholesaler
+  restaurant
+  supermarket
+  other
+
+  @@map("business_type")
+}
+
+enum DistributionStatus {
+  new
+  contacted
+  qualified
+  closed
+
+  @@map("distribution_status")
+}
+
+/// حالات دورة طلب الشراء كما اعتمدتها Phase F.
+enum PurchaseOrderStatus {
+  new
+  under_review
+  awaiting_customer_approval
+  confirmed
+  rejected
+
+  @@map("purchase_order_status")
+}
+
+// ----------------------------------------------------------------------------
+// users — مدراء لوحة الإدارة
+// ----------------------------------------------------------------------------
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  /// يُخزَّن بحروف صغيرة دائمًا (يُفرض بـ CHECK في الـ migration)
+  email        String   @unique @db.VarChar(254)
+  /// ناتج Argon2id المشفّر كاملًا (يتضمن الـ salt والمعاملات) — لا كلمة مرور نصية أبدًا
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         UserRole @default(admin)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("users")
+}
+
+// ----------------------------------------------------------------------------
+// categories — تصنيفات المنتجات (صلصات، تتبيلات، ...)
+// ----------------------------------------------------------------------------
+
+model Category {
+  id          Int       @id @default(autoincrement())
+  name        String    @unique @db.VarChar(100)
+  /// معرّف مختصر لاستخدامه في الروابط: ?category=sauces
+  slug        String    @unique @db.VarChar(100)
+  description String?   @db.Text
+  /// الاسم الإنجليزي (اختياري): يُعرض في /en، وإن غاب يُعرض الاسم العربي
+  nameEn        String?   @map("name_en") @db.VarChar(100)
+  descriptionEn String?   @map("description_en") @db.Text
+  /// يحدد ترتيب أزرار الفلاتر في الواجهة (الأصغر أولًا)
+  sortOrder   Int       @default(0) @map("sort_order")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  products    Product[]
+
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+// ----------------------------------------------------------------------------
+// products
+// ----------------------------------------------------------------------------
+
+model Product {
+  id          Int         @id @default(autoincrement())
+  name        String      @db.VarChar(150)
+  slug        String      @unique @db.VarChar(150)
+  description String?     @db.Text
+  /// الاسم/الوصف الإنجليزيان (اختياريان): يُعرضان في /en، وإن غابا يُعرض النص العربي
+  nameEn        String?   @map("name_en") @db.VarChar(150)
+  descriptionEn String?   @map("description_en") @db.Text
+  categoryId  Int         @map("category_id")
+  /// مثال: /img/Ketchup.png  (لاحقًا قد يصبح رابط رفع كامل)
+  imageUrl    String      @map("image_url") @db.VarChar(500)
+  tone        ProductTone @default(gold)
+  /// false = مخفي عن الموقع العام (بدل الحذف النهائي)
+  isActive    Boolean     @default(true) @map("is_active")
+  isFeatured  Boolean     @default(false) @map("is_featured")
+  /// ترتيب العرض في الشبكة (الأصغر أولًا)
+  sortOrder   Int         @default(0) @map("sort_order")
+
+  // ---- مواصفات المنتج (PHASE 11B): كلها اختيارية. كل Product = مقاس عبوة (SKU) مستقل ----
+  // العبوة: القيمة والوحدة معًا أو لا شيء (قيد CHECK). الباركود نص (يحافظ على الأصفار البادئة) وفريد.
+  netContent            Decimal?     @map("net_content") @db.Decimal(10, 3)
+  netContentUnit        ContentUnit? @map("net_content_unit")
+  packType              String?      @map("pack_type") @db.VarChar(80)
+  packTypeEn            String?      @map("pack_type_en") @db.VarChar(80)
+  packMaterial          String?      @map("pack_material") @db.VarChar(80)
+  packMaterialEn        String?      @map("pack_material_en") @db.VarChar(80)
+  barcode               String?      @unique @db.VarChar(14)
+  // الكرتونة: الأبعاد بالسنتيمتر (الثلاثة معًا أو لا شيء) والأوزان بالكيلوغرام
+  cartonUnits           Int?         @map("carton_units")
+  cartonLengthCm        Decimal?     @map("carton_length_cm") @db.Decimal(7, 2)
+  cartonWidthCm         Decimal?     @map("carton_width_cm") @db.Decimal(7, 2)
+  cartonHeightCm        Decimal?     @map("carton_height_cm") @db.Decimal(7, 2)
+  cartonNetWeightKg     Decimal?     @map("carton_net_weight_kg") @db.Decimal(8, 3)
+  cartonGrossWeightKg   Decimal?     @map("carton_gross_weight_kg") @db.Decimal(8, 3)
+  // الصلاحية والتخزين (القيمة والوحدة معًا أو لا شيء)
+  shelfLifeValue        Int?         @map("shelf_life_value")
+  shelfLifeUnit         TimeUnit?    @map("shelf_life_unit")
+  storageNote           String?      @map("storage_note") @db.Text
+  storageNoteEn         String?      @map("storage_note_en") @db.Text
+  // التصدير (لا يُعرض للزوار مبدئيًا): رمز ISO للبلد، رمز HS أرقام فقط (لا يُخمَّن)، الطبلية، ملاحظات التعبئة
+  originCountry         String?      @map("origin_country") @db.VarChar(2)
+  hsCode                String?      @map("hs_code") @db.VarChar(10)
+  palletCartons         Int?         @map("pallet_cartons")
+  palletCartonsPerLayer Int?         @map("pallet_cartons_per_layer")
+  exportNote            String?      @map("export_note") @db.Text
+  exportNoteEn          String?      @map("export_note_en") @db.Text
+  // تسعير مستقبلي اختياري لكل عبوة مفردة؛ لا يُعرض للزوار حاليًا.
+  unitPrice             Decimal?     @map("unit_price") @db.Decimal(12, 2)
+  priceCurrency         String?      @map("price_currency") @db.VarChar(3)
+
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  // لا يمكن حذف تصنيف ما دام فيه منتجات
+  category            Category             @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  inquiries           Inquiry[]
+  purchaseOrderItems  PurchaseOrderItem[]
+
+  // القائمة العامة: WHERE is_active ORDER BY sort_order
+  @@index([isActive, sortOrder])
+  // القائمة المفلترة بتصنيف (ويخدم أيضًا فحص الـ FK عند حذف تصنيف)
+  @@index([categoryId, isActive, sortOrder])
+  @@map("products")
+}
+
+// ----------------------------------------------------------------------------
+// inquiries — استفسارات الزبائن (أفراد)
+// ----------------------------------------------------------------------------
+
+model Inquiry {
+  id        Int           @id @default(autoincrement())
+  name      String        @db.VarChar(100)
+  phone     String?       @db.VarChar(30)
+  email     String?       @db.VarChar(254)
+  message   String?       @db.Text
+  /// المنتج المعني إن وُجد؛ يصبح NULL إذا حُذف المنتج نهائيًا (يبقى الاستفسار)
+  productId Int?          @map("product_id")
+  source    InquirySource
+  status    InquiryStatus @default(new)
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  product   Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // لوحة الإدارة: فلترة بالحالة + الأحدث أولًا
+  @@index([status, createdAt(sort: Desc)])
+  // فهرس الـ FK (يسرّع ON DELETE SET NULL وعرض استفسارات منتج معين)
+  @@index([productId])
+  @@map("inquiries")
+}
+
+// ----------------------------------------------------------------------------
+// distribution_requests — طلبات التوزيع والجملة (B2B)
+// ----------------------------------------------------------------------------
+
+model DistributionRequest {
+  id           Int                @id @default(autoincrement())
+  name         String             @db.VarChar(100)
+  businessName String             @map("business_name") @db.VarChar(150)
+  phone        String             @db.VarChar(30)
+  whatsapp     String?            @db.VarChar(30)
+  email        String?            @db.VarChar(254)
+  city         String?            @db.VarChar(100)
+  area         String?            @db.VarChar(100)
+  businessType BusinessType       @map("business_type")
+  message      String?            @db.Text
+  status       DistributionStatus @default(new)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([status, createdAt(sort: Desc)])
+  @@map("distribution_requests")
+}
+
+
+// ----------------------------------------------------------------------------
+// purchase_orders — طلبات الشراء المرسلة من الموقع (Guest Checkout)
+// لا يوجد حد أدنى للطلب أو خصم مخزون أو سعر نهائي في المرحلة الحالية.
+// ----------------------------------------------------------------------------
+
+model PurchaseOrder {
+  id           Int                 @id @default(autoincrement())
+  customerName String              @map("customer_name") @db.VarChar(100)
+  phone        String              @db.VarChar(30)
+  businessName String              @map("business_name") @db.VarChar(150)
+  city         String              @db.VarChar(100)
+  area         String?             @db.VarChar(100)
+  address      String?             @db.VarChar(300)
+  email        String?             @db.VarChar(254)
+  whatsapp     String?             @db.VarChar(30)
+  customerNote String?             @map("customer_note") @db.Text
+  adminNote    String?             @map("admin_note") @db.Text
+  status       PurchaseOrderStatus @default(new)
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  items PurchaseOrderItem[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([phone, createdAt(sort: Desc)])
+  @@map("purchase_orders")
+}
+
+// كل سطر يحتفظ بصورة من بيانات المنتج وقت الطلب حتى يبقى سجل الطلب مفهومًا
+// إذا تغيّر اسم المنتج أو مواصفات الكرتون أو حُذف المنتج لاحقًا.
+model PurchaseOrderItem {
+  id              Int      @id @default(autoincrement())
+  orderId         Int      @map("order_id")
+  productId       Int?     @map("product_id")
+  productName     String   @map("product_name") @db.VarChar(150)
+  productNameEn   String?  @map("product_name_en") @db.VarChar(150)
+  productSlug     String   @map("product_slug") @db.VarChar(150)
+  cartonQuantity  Int      @default(0) @map("carton_quantity")
+  unitQuantity    Int      @default(0) @map("unit_quantity")
+  unitsPerCarton  Int?     @map("units_per_carton")
+  totalUnits      Int      @map("total_units")
+  // لقطة سعرية مستقبلية لكل عبوة مفردة؛ تبقى NULL في سياسة المرحلة الحالية.
+  unitPrice       Decimal? @map("unit_price") @db.Decimal(12, 2)
+  priceCurrency   String?  @map("price_currency") @db.VarChar(3)
+
+  order   PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, productId])
+  @@index([productId])
+  @@map("purchase_order_items")
+}

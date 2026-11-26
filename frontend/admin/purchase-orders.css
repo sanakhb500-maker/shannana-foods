@@ -1,0 +1,317 @@
+/* Shannana Foods — purchase orders admin page. Extends the existing admin.css tokens and components. */
+.po-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:0 0 20px; }
+.po-summary-card { min-width:0; padding:15px 18px; background:#fff; border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); }
+.po-summary-card span { display:block; color:var(--muted); font-size:13px; font-weight:700; }
+.po-summary-card strong { display:block; margin-top:3px; color:var(--ink); font-size:27px; line-height:1.25; font-weight:900; }
+.po-toolbar select { min-width:210px; }
+.po-table-wrap { overflow-x:auto; }
+.po-table { min-width:980px; }
+.po-table td { font-size:13px; }
+.po-table .po-primary { display:block; font-weight:900; color:var(--ink); }
+.po-table .po-secondary { display:block; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+.po-table .po-items-summary { max-width:230px; color:var(--muted); line-height:1.7; }
+.po-status { margin:0; white-space:nowrap; }
+.po-status.status-new { background:#f5ecd9; color:#8a6410; }
+.po-status.status-under_review { background:#e7edf5; color:#345b88; }
+.po-status.status-awaiting_customer_approval { background:#f7e3e5; color:var(--red-deep); }
+.po-status.status-confirmed { background:#e9efdc; color:var(--olive-dark); }
+.po-status.status-rejected { background:#ece6dd; color:#70665d; }
+.po-open-btn { padding:6px 13px; font-size:12px; white-space:nowrap; }
+.po-dialog { width:min(860px,95vw); max-height:94vh; }
+.po-dialog .dlg-head { position:sticky; top:0; z-index:1; background:#fff; }
+.po-dialog .dlg-head h3 { margin-bottom:1px; }
+.po-dialog .dlg-body { display:grid; gap:18px; }
+.po-detail-section { padding:17px; border:1px solid var(--line); border-radius:17px; background:#fff; }
+.po-section-title { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+.po-section-title h4 { margin:0; font-size:16px; font-weight:900; }
+.po-section-title small { color:var(--muted); font-size:12px; }
+.po-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px 18px; }
+.po-detail-grid > div { min-width:0; }
+.po-detail-grid small { display:block; margin-bottom:2px; color:var(--muted); font-size:12px; font-weight:700; }
+.po-detail-grid strong { display:block; overflow-wrap:anywhere; font-size:14px; font-weight:800; }
+.po-detail-wide { grid-column:1/-1; }
+.po-note-view { margin:0; padding:10px 12px; border-radius:12px; background:var(--cream); color:var(--muted); white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; }
+.po-items-wrap { overflow-x:auto; box-shadow:none; border-radius:12px; }
+.po-items-table { min-width:620px; }
+.po-items-table th,.po-items-table td { padding:9px 11px; font-size:12px; }
+.po-total-line { display:flex; justify-content:space-between; gap:12px; margin-top:12px; padding:11px 13px; border-radius:12px; background:#edf1e7; color:var(--olive-dark); font-weight:800; }
+.po-status-editor { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.po-status-editor select { flex:1 1 240px; min-width:0; border:1px solid rgba(36,32,30,.18); border-radius:12px; padding:10px 13px; background:var(--cream); font:inherit; }
+.po-private-note textarea { display:block; width:100%; min-height:100px; resize:vertical; border:1px solid rgba(36,32,30,.18); border-radius:12px; padding:11px 13px; background:var(--cream); font:inherit; }
+.po-private-note textarea:focus { outline:0; border-color:var(--red-soft); background:#fff; box-shadow:0 0 0 4px rgba(201,90,98,.16); }
+.po-note-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:10px; }
+.po-note-actions .hint { margin:0; }
+.po-dialog .hint { color:var(--muted); font-size:12px; }
+@media (max-width:1000px) { .po-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:760px) {
+  .po-summary { gap:8px; }
+  .po-summary-card { padding:12px; }
+  .po-summary-card strong { font-size:23px; }
+  .po-toolbar select { width:100%; }
+  .po-table { min-width:0; }
+  .po-table thead { display:none; }
+  .po-table,.po-table tbody,.po-table tr,.po-table td { display:block; width:100%; }
+  .po-table tr { display:grid; grid-template-columns:1fr 1fr; gap:5px 12px; padding:13px 15px; border-bottom:1px solid var(--line); }
+  .po-table td { padding:3px 0; border:0; min-width:0; }
+  .po-table td::before { content:attr(data-label) ': '; display:block; color:var(--muted); font-size:11px; font-weight:700; }
+  .po-table td[data-label="العميل / المحل"] { grid-column:1/-1; }
+  .po-table td[data-label="المنتجات والكميات"] { grid-column:1/-1; }
+  .po-table td[data-label="التفاصيل"] { grid-column:1/-1; padding-top:7px; }
+  .po-table td[data-label="التفاصيل"]::before { content:none; }
+  .po-dialog .dlg-body { padding:14px; }
+  .po-detail-section { padding:13px; }
+  .po-detail-grid { grid-template-columns:1fr 1fr; gap:11px; }
+}
+@media (max-width:440px) { .po-detail-grid { grid-template-columns:1fr; } .po-detail-wide { grid-column:auto; } }
+
+/* Mobile refinement — keep the desktop table unchanged and make each order a readable card. */
+@media (max-width: 760px) {
+  .po-table-wrap {
+    overflow: visible;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .po-table {
+    width: 100%;
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .po-table tbody {
+    display: grid;
+    gap: 12px;
+  }
+
+  .po-table tr {
+    display: grid;
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "reference status"
+      "customer contact"
+      "items items"
+      "date date"
+      "details details";
+    align-items: start;
+    gap: 11px 14px;
+    margin: 0;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: var(--shadow);
+  }
+
+  .po-table td {
+    display: block;
+    width: auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .po-table td::before {
+    display: block;
+    margin: 0 0 3px;
+    color: var(--muted);
+    font-size: 10px;
+    line-height: 1.35;
+    font-weight: 800;
+  }
+
+  .po-table td[data-label="رقم الطلب"] { grid-area: reference; }
+  .po-table td[data-label="الحالة"] { grid-area: status; text-align: left; }
+  .po-table td[data-label="العميل / المحل"] { grid-area: customer; }
+  .po-table td[data-label="التواصل"] { grid-area: contact; }
+  .po-table td[data-label="المنتجات والكميات"] { grid-area: items; }
+  .po-table td[data-label="تاريخ الطلب"] { grid-area: date; }
+  .po-table td[data-label="التفاصيل"] { grid-area: details; }
+
+  .po-table td[data-label="رقم الطلب"]::before,
+  .po-table td[data-label="الحالة"]::before,
+  .po-table td[data-label="التفاصيل"]::before {
+    content: none;
+  }
+
+  .po-table td[data-label="رقم الطلب"] .po-primary {
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .po-table td[data-label="رقم الطلب"] .po-secondary {
+    font-size: 11px;
+  }
+
+  .po-table td[data-label="الحالة"] {
+    align-self: center;
+  }
+
+  .po-table .po-status {
+    display: inline-flex;
+    max-width: 100%;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 5px 9px;
+  }
+
+  .po-table td[data-label="العميل / المحل"] .po-primary,
+  .po-table td[data-label="التواصل"] .po-primary {
+    font-size: 13px;
+  }
+
+  .po-table td[data-label="العميل / المحل"] .po-secondary,
+  .po-table td[data-label="التواصل"] .po-secondary {
+    font-size: 11px;
+  }
+
+  .po-table .po-items-summary {
+    display: block;
+    max-width: none;
+    margin-bottom: 2px;
+    color: var(--ink);
+    font-weight: 800;
+    font-size: 12px;
+  }
+
+  .po-table td[data-label="المنتجات والكميات"] .po-secondary {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-height: 1.55;
+  }
+
+  .po-table td[data-label="التفاصيل"] {
+    padding-top: 2px;
+  }
+
+  .po-table .po-open-btn {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    border-radius: 11px;
+    font-size: 13px;
+  }
+
+  .po-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .po-toolbar input,
+  .po-toolbar select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 440px) {
+  .po-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .po-summary-card {
+    padding: 10px 11px;
+  }
+
+  .po-summary-card span {
+    font-size: 11px;
+  }
+
+  .po-summary-card strong {
+    font-size: 21px;
+  }
+
+  .po-table tr {
+    gap: 9px 11px;
+    padding: 12px;
+  }
+
+  .po-dialog {
+    width: calc(100vw - 16px);
+    max-width: none;
+    max-height: calc(100dvh - 16px);
+  }
+
+  .po-dialog .dlg-body {
+    padding: 11px;
+    gap: 11px;
+  }
+
+  .po-detail-section {
+    padding: 11px;
+  }
+}
+
+/* Very narrow previews: keep labels and values on the same line where possible. */
+@media (max-width: 340px) {
+  .po-table tr {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "reference"
+      "status"
+      "customer"
+      "contact"
+      "items"
+      "date"
+      "details";
+    gap: 8px;
+  }
+
+  .po-table td:not([data-label="التفاصيل"]) {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    column-gap: 6px;
+    row-gap: 2px;
+  }
+
+  .po-table td:not([data-label="التفاصيل"])::before {
+    display: inline;
+    flex: 0 0 auto;
+    margin: 0;
+  }
+
+  .po-table td[data-label="رقم الطلب"]::before,
+  .po-table td[data-label="الحالة"]::before {
+    content: none;
+  }
+
+  .po-table td[data-label="العميل / المحل"] .po-primary,
+  .po-table td[data-label="التواصل"] .po-primary,
+  .po-table td[data-label="العميل / المحل"] .po-secondary,
+  .po-table td[data-label="التواصل"] .po-secondary {
+    display: inline;
+  }
+
+  .po-table td[data-label="المنتجات والكميات"] {
+    display: block;
+  }
+
+  .po-table td[data-label="التفاصيل"] {
+    display: block;
+  }
+}
+
+@media (max-width: 760px) {
+  .content {
+    width: 100%;
+    max-width: none;
+    padding-right: 0 !important;
+    padding-left: 8px !important;
+    margin: 0;
+  }
+}

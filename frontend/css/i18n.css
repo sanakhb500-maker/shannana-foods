@@ -1,0 +1,48 @@
+/* Shannana Foods — language switch + English/LTR adjustments. Loaded after style.css and forms.css.
+   style.css already uses logical flow (grid/flex follow <html dir>), so only the few physical rules need overrides. */
+
+/* ---------- Language switch ( العربية | English ) ---------- */
+.lang-switch { display:inline-flex; align-items:center; gap:2px; padding:3px; background:#fff; border:1px solid rgba(36,32,30,.14); border-radius:999px; }
+.lang-switch .lang-opt { display:inline-flex; align-items:center; justify-content:center; padding:5px 13px; border-radius:999px; font-weight:800; font-size:13px; line-height:1.5; color:var(--ink); white-space:nowrap; transition:background .2s,color .2s; }
+.lang-switch .lang-opt:hover { background:var(--sand); }
+.lang-switch .lang-opt.active { background:var(--brand-red); color:#fff; cursor:default; }
+.lang-switch .lang-opt:focus-visible { outline:3px solid var(--olive); outline-offset:2px; }
+.lang-switch .lang-opt[lang="en"] { font-family:'Cairo',system-ui,sans-serif; direction:ltr; }
+.mobile-panel .lang-switch { margin:14px 20px 16px; display:flex; width:calc(100% - 40px); }
+.mobile-panel .lang-switch a.lang-opt { flex:1; padding:9px 12px; border-bottom:0; font-size:15px; }
+@media (max-width:540px) { .lang-switch.lang-header { display:none; } }
+
+/* ---------- English / LTR ---------- */
+html[dir="ltr"] body { text-align:left; }
+html[lang="en"] h1, html[lang="en"] h2, html[lang="en"] h3 { letter-spacing:-.01em; }
+html[lang="en"] .hero h1 { line-height:1.12; }
+html[lang="en"] .hero-lead, html[lang="en"] .section-intro { line-height:1.75; }
+html[lang="en"] .eyebrow, html[lang="en"] .section-kicker { letter-spacing:.02em; }
+html[lang="en"] .nav { gap:clamp(14px,1.8vw,26px); }
+html[lang="en"] .nav a, html[lang="en"] .header-cta { font-size:14px; white-space:nowrap; }
+html[lang="en"] .why-panel::after { content:"SHANNANA"; font-size:96px; letter-spacing:.02em; }
+/* the "→" arrow in "Order this product →" moves forward (to the right) on hover */
+html[dir="ltr"] .order-link:hover { translate:3px 0; }
+html[dir="ltr"] .pw-toggle { left:auto; right:8px; }
+
+/* ---------- Header fit between tablet and desktop (the language switch adds width) ---------- */
+.nav a { white-space:nowrap; }
+@media (min-width:821px) and (max-width:1100px) {
+  .nav-wrap { gap:10px; }
+  .brand { min-width:0; }
+  .nav { gap:clamp(8px,1.3vw,16px); }
+  .nav a { font-size:13.5px; }
+  .header-cta { padding:9px 14px; font-size:13px; }
+  .lang-switch .lang-opt { padding:4px 9px; font-size:12px; }
+}
+
+/* ---------- English headings: the base sizes were tuned for Arabic glyph widths ---------- */
+html[lang="en"] .hero h1 { font-size:clamp(40px,4.6vw,62px); line-height:1.12; letter-spacing:-.02em; }
+html[lang="en"] .section h2 { font-size:clamp(30px,3.6vw,46px); line-height:1.18; letter-spacing:-.015em; }
+@media (max-width:1100px) { html[lang="en"] .hero h1 { font-size:clamp(38px,6vw,52px); } }
+@media (max-width:540px) { html[lang="en"] .hero h1 { font-size:36px; line-height:1.15; } html[lang="en"] .hero-lead { line-height:1.7; } }
+
+/* ---------- Product cards: image/title link to the details page (PHASE 11A) ---------- */
+.product-link { display:contents; cursor:pointer; }
+.product-title a { color:inherit; }
+.product-title a:hover { color:var(--brand-red); }

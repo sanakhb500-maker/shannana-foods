@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>طلبات الشراء | شنانة فودز</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/purchase-orders.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar" aria-label="القائمة الجانبية">
+      <div class="side-brand"><strong>شنانة فودز</strong><span>لوحة الإدارة</span></div>
+      <nav class="side-nav">
+        <a class="nav-item" href="/admin"><span class="nav-symbol" aria-hidden="true">⌂</span>لوحة التحكم</a>
+        <a class="nav-item" href="/admin/products"><span class="nav-symbol" aria-hidden="true">▣</span>المنتجات</a>
+        <a class="nav-item" href="/admin/categories"><span class="nav-symbol" aria-hidden="true">◇</span>التصنيفات</a>
+        <a class="nav-item" href="/admin/inquiries"><span class="nav-symbol" aria-hidden="true">✉</span>الاستفسارات</a>
+        <a class="nav-item" href="/admin/distribution"><span class="nav-symbol" aria-hidden="true">⇄</span>طلبات التوزيع</a>
+        <a class="nav-item active" aria-current="page" data-purchase-orders-nav href="/admin/purchase-orders"><span class="nav-symbol" aria-hidden="true">🛒</span>طلبات الشراء</a>
+      </nav>
+      <div class="side-foot">
+        <a class="nav-item" href="/" target="_blank" rel="noopener"><span class="nav-symbol" aria-hidden="true">↗</span>عرض الموقع</a>
+        <button class="nav-item" id="logoutBtn" type="button"><span class="nav-symbol" aria-hidden="true">⇥</span>تسجيل الخروج</button>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="فتح القائمة" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <h1>طلبات الشراء</h1>
+        <div class="user-chip">
+          <div class="who"><b id="userName">…</b><small id="userEmail" dir="ltr"></small></div>
+          <div class="avatar" id="avatar" aria-hidden="true">·</div>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="page-head">
+          <div>
+            <h2 class="greeting">إدارة طلبات الشراء</h2>
+            <p class="greeting-sub">راجعي بيانات العملاء والكميات، وتابعي كل طلب حسب مرحلته. الأسعار والتأكيد النهائي يتمان خارج النظام عبر التواصل مع العميل.</p>
+          </div>
+          <button class="btn btn-ghost" id="refreshBtn" type="button">↻ تحديث القائمة</button>
+        </div>
+
+        <div class="po-summary" aria-label="ملخص حالات الطلبات">
+          <div class="po-summary-card"><span>كل الطلبات</span><strong id="totalCount">—</strong></div>
+          <div class="po-summary-card"><span>طلبات جديدة</span><strong id="newCount">—</strong></div>
+          <div class="po-summary-card"><span>قيد المراجعة</span><strong id="reviewCount">—</strong></div>
+          <div class="po-summary-card"><span>بانتظار العميل</span><strong id="awaitingCount">—</strong></div>
+        </div>
+
+        <div class="toolbar po-toolbar">
+          <input id="search" type="search" placeholder="بحث برقم الطلب أو العميل أو الهاتف أو المحل…" maxlength="100" aria-label="بحث في الطلبات" />
+          <select id="statusFilter" aria-label="تصفية حسب حالة الطلب">
+            <option value="all">كل الحالات</option>
+            <option value="new">جديد</option>
+            <option value="under_review">قيد المراجعة</option>
+            <option value="awaiting_customer_approval">بانتظار موافقة العميل</option>
+            <option value="confirmed">مؤكد</option>
+            <option value="rejected">مرفوض</option>
+          </select>
+          <span class="count" id="count" aria-live="polite"></span>
+        </div>
+
+        <div class="alert" id="pageError" role="alert" hidden></div>
+        <div class="table-wrap po-table-wrap">
+          <table class="tbl po-table" id="ordersTable">
+            <thead><tr><th>رقم الطلب</th><th>العميل / المحل</th><th>التواصل</th><th>المنتجات والكميات</th><th>تاريخ الطلب</th><th>الحالة</th><th>التفاصيل</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="empty" id="empty" hidden>لا توجد طلبات مطابقة.</div>
+          <div class="empty" id="loading">جارٍ تحميل الطلبات…</div>
+          <div class="pagination" id="pagination" hidden>
+            <button class="btn btn-ghost sm" id="prevPage" type="button">السابق</button>
+            <span id="pageLabel"></span>
+            <button class="btn btn-ghost sm" id="nextPage" type="button">التالي</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="dlg po-dialog" id="orderDialog" aria-labelledby="dialogTitle">
+    <div class="dlg-head">
+      <div><h3 id="dialogTitle">تفاصيل الطلب</h3><small class="request-id" id="dialogReference"></small></div>
+      <button type="button" class="x" id="dialogClose" aria-label="إغلاق">×</button>
+    </div>
+    <div class="dlg-body">
+      <div class="alert" id="detailError" role="alert" hidden></div>
+      <section class="po-detail-section">
+        <div class="po-section-title"><h4>بيانات العميل</h4><span id="detailStatus"></span></div>
+        <div class="po-detail-grid">
+          <div><small>اسم المسؤول</small><strong id="detailCustomer">—</strong></div>
+          <div><small>اسم المحل / المنشأة</small><strong id="detailBusiness">—</strong></div>
+          <div><small>رقم الهاتف</small><strong id="detailPhone" dir="ltr">—</strong></div>
+          <div><small>واتساب بديل</small><strong id="detailWhatsapp" dir="ltr">—</strong></div>
+          <div><small>المدينة</small><strong id="detailCity">—</strong></div>
+          <div><small>المنطقة</small><strong id="detailArea">—</strong></div>
+          <div><small>البريد الإلكتروني</small><strong id="detailEmail" dir="ltr">—</strong></div>
+          <div><small>تاريخ إنشاء الطلب</small><strong id="detailCreated">—</strong></div>
+          <div class="po-detail-wide"><small>العنوان الكامل</small><strong id="detailAddress">—</strong></div>
+          <div class="po-detail-wide"><small>ملاحظات العميل</small><p id="detailCustomerNote" class="po-note-view">لا توجد ملاحظات.</p></div>
+        </div>
+      </section>
+
+      <section class="po-detail-section">
+        <div class="po-section-title"><h4>عناصر الطلب</h4><small>الكميات كما أرسلها العميل</small></div>
+        <div class="table-wrap po-items-wrap">
+          <table class="tbl po-items-table">
+            <thead><tr><th>المنتج</th><th>الكراتين</th><th>الوحدات المفردة</th><th>عدد الوحدات بالكرتونة</th><th>الإجمالي بالوحدات</th></tr></thead>
+            <tbody id="itemRows"></tbody>
+          </table>
+        </div>
+        <div class="po-total-line"><span>إجمالي وحدات الطلب</span><strong id="detailTotalUnits">—</strong></div>
+      </section>
+
+      <section class="po-detail-section">
+        <div class="po-section-title"><h4>تحديث حالة الطلب</h4><small>يُسمح بالانتقال إلى المرحلة التالية فقط</small></div>
+        <div class="po-status-editor">
+          <select id="nextStatus" aria-label="الحالة التالية"></select>
+          <button class="btn btn-primary" id="saveStatusBtn" type="button">حفظ الحالة</button>
+        </div>
+        <p class="hint" id="statusHint">لا يتم تأكيد الطلب إلا بعد مراجعة التوفر والحصول على موافقة العميل.</p>
+      </section>
+
+      <section class="po-detail-section po-private-note">
+        <div class="po-section-title"><h4>ملاحظة داخلية للمدير</h4><small>لا تظهر للعميل</small></div>
+        <textarea id="adminNote" rows="4" maxlength="2000" placeholder="اكتبي ملاحظة متابعة أو سبب الرفض عند الحاجة…"></textarea>
+        <div class="po-note-actions"><span class="hint">يمكن استخدام هذه الخانة لتوثيق سبب الرفض أو ملاحظات التواصل.</span><button class="btn btn-ghost" id="saveNoteBtn" type="button">حفظ الملاحظة</button></div>
+      </section>
+    </div>
+  </dialog>
+
+  <script src="/admin/admin-common.js" defer></script>
+  <script src="/admin/purchase-orders.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="{{lang}}" dir="{{dir}}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!--P:SEO-->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="/css/forms.css">
+  <link rel="stylesheet" href="/css/i18n.css">
+  <link rel="stylesheet" href="/css/cart.css">
+  <link rel="stylesheet" href="/css/product.css">
+  <script src="/js/boot.js"></script>
+</head>
+
+<body>
+  <header class="site-header" id="header">
+    <div class="container">
+      <div class="nav-wrap">
+        <a class="brand" href="[[p:home]]#home" aria-label="{{brand.aria}}">
+          <img src="/img/shannana-logo.png" alt="{{brand.logoAlt}}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-block';">
+          <span class="brand-fallback">{{brand.name}}</span>
+        </a>
+
+        <nav class="nav" aria-label="{{nav.aria}}">
+          <a href="[[p:home]]#home">{{nav.home}}</a>
+          <a href="[[p:home]]#products">{{nav.products}}</a>
+          <a href="[[p:home]]#why">{{nav.why}}</a>
+          <a href="[[p:home]]#b2b">{{nav.b2b}}</a>
+          <a href="#contact">{{nav.contact}}</a>
+        </nav>
+
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;">
+          <div class="lang-switch lang-header" role="group" aria-label="{{lang.aria}}"><a class="lang-opt{{lang.cls.ar}}" href="[[p:langhref.ar]]" lang="ar" hreflang="ar"{{{lang.cur.ar}}} data-lang-link>العربية</a><a class="lang-opt{{lang.cls.en}}" href="[[p:langhref.en]]" lang="en" hreflang="en"{{{lang.cur.en}}} data-lang-link>English</a></div>
+          <a class="header-cta" href="https://wa.me/963985034031" target="_blank" rel="noopener">{{nav.cta}}</a>
+          <button class="cart-toggle" id="cartToggle" type="button" aria-label="{{cart.open}}" aria-haspopup="dialog" aria-controls="sfCartDialog">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.2 11.1a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>
+            <span class="cart-count" data-cart-count hidden>0</span>
+          </button>
+          <button class="menu-btn" id="menuBtn" aria-label="{{nav.menu}}" aria-expanded="false">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="mobile-panel" id="mobilePanel">
+        <a href="[[p:home]]#home">{{nav.home}}</a>
+        <a href="[[p:home]]#products">{{nav.products}}</a>
+        <a href="[[p:home]]#why">{{nav.why}}</a>
+        <a href="[[p:home]]#b2b">{{nav.b2b}}</a>
+        <a href="#contact">{{nav.contact}}</a>
+        <a href="https://wa.me/963985034031" target="_blank" rel="noopener">{{nav.cta}}</a>
+        <div class="lang-switch lang-mobile" role="group" aria-label="{{lang.aria}}"><a class="lang-opt{{lang.cls.ar}}" href="[[p:langhref.ar]]" lang="ar" hreflang="ar"{{{lang.cur.ar}}} data-lang-link>العربية</a><a class="lang-opt{{lang.cls.en}}" href="[[p:langhref.en]]" lang="en" hreflang="en"{{{lang.cur.en}}} data-lang-link>English</a></div>
+      </div>
+    </div>
+  </header>
+  <main class="product-page">
+    <!--P:FOUND-->
+    <div class="container">
+      <nav class="crumbs" aria-label="[[t:crumb.label]]">
+        <a href="[[p:home]]">[[t:crumb.home]]</a><span class="sep" aria-hidden="true"></span>
+        <a href="[[p:home]]#products">[[t:crumb.products]]</a><span class="sep" aria-hidden="true"></span>
+        <span aria-current="page">[[p:name]]</span>
+      </nav>
+      <article class="pd">
+        <div class="pd-media tone-[[p:tone]]">
+          <img class="pd-image" src="[[p:image]]" alt="[[p:name]]" width="640" height="640" fetchpriority="high">
+        </div>
+        <div class="pd-info">
+          <span class="category-badge">[[p:category]]</span>
+          <h1>[[p:name]]</h1>
+          <p class="pd-desc">[[p:description]]</p>
+          <div class="pd-actions">
+            <button class="btn btn-primary" id="productAddToCart" type="button" data-cart-add
+              data-product-id="[[p:productId]]"
+              data-product-name="[[p:name]]"
+              data-product-name-ar="[[p:nameAr]]"
+              data-product-name-en="[[p:nameEn]]"
+              data-product-slug="[[p:slug]]"
+              data-product-image="[[p:image]]"
+              data-product-tone="[[p:tone]]"
+              data-carton-units="[[p:cartonUnits]]"></button>
+            <button class="btn btn-secondary" type="button" data-open-form="inquiry">[[t:btn.inquire]]</button>
+            <a class="btn btn-secondary" href="[[p:technicalSheetUrl]]" download>[[t:btn.technicalSheet]]</a>
+          </div>
+          <a class="pd-scroll-cue" href="#pdSpecsTitle" aria-label="انتقل إلى مواصفات المنتج / Scroll to product specifications">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 5v14m-7-7 7 7 7-7" />
+            </svg>
+          </a>
+          <a class="pd-back" href="[[p:home]]#products">[[t:btn.back]]</a>
+        </div>
+      </article>
+      <!--P:SPECIFICATIONS-->
+      <!--/P:SPECIFICATIONS-->
+    </div>
+    <!--/P:FOUND-->
+    <!--P:MISSING-->
+    <div class="container">
+      <div class="pd-missing">
+        <h1>[[t:nf.title]]</h1>
+        <p>[[t:nf.text]]</p>
+        <a class="btn btn-primary" href="[[p:home]]#products">[[t:btn.back]]</a>
+      </div>
+    </div>
+    <!--/P:MISSING-->
+  </main>
+
+  <footer id="contact">
+    <div class="container footer-main">
+      <div>
+        <img class="footer-logo" src="/img/shannana-logo.png" alt="{{footer.logoAlt}}" onerror="this.style.display='none'">
+        <p>{{footer.about}}</p>
+        <div class="socials">
+          <a href="#" aria-label="{{footer.fb}}">f</a>
+          <a href="#" aria-label="{{footer.ig}}">◎</a>
+          <a href="https://wa.me/963985034031" target="_blank" rel="noopener" aria-label="{{footer.wa}}">◔</a>
+        </div>
+      </div>
+      <div>
+        <h4>{{footer.quick}}</h4>
+        <ul><li><a href="[[p:home]]#home">{{nav.home}}</a></li><li><a href="[[p:home]]#products">{{nav.products}}</a></li><li><a href="[[p:home]]#why">{{nav.why}}</a></li><li><a href="[[p:home]]#b2b">{{footer.link.b2b}}</a></li></ul>
+      </div>
+      <div>
+        <h4>{{footer.cats}}</h4>
+        <ul><li>{{footer.cat.1}}</li><li>{{footer.cat.2}}</li><li>{{footer.cat.3}}</li><li>{{footer.cat.4}}</li></ul>
+      </div>
+      <div>
+        <h4>{{nav.contact}}</h4>
+        <ul><li>{{footer.address}}</li><li dir="ltr">+963 985 034 031</li><li dir="ltr">info@shanana-foods.com</li><li><button class="link-btn" type="button" data-open-form="inquiry">{{footer.inquiry}}</button></li></ul>
+      </div>
+    </div>
+    <div class="container footer-bottom"><span>{{footer.copy}}</span></div>
+  </footer>
+
+  <!-- Public inquiry dialog -->
+  <dialog class="sf-dlg" id="inquiryDlg" aria-labelledby="inquiryTitle">
+    <form class="sf-form" data-form="inquiry" novalidate>
+      <div class="sf-head"><h3 id="inquiryTitle">{{fi.title}}</h3><button class="sf-x" type="button" data-close aria-label="{{f.closeAria}}">×</button></div>
+      <p class="sf-lead">{{fi.lead}}</p>
+      <div class="sf-body">
+        <div class="sf-alert" role="alert" aria-live="polite" hidden></div>
+        <input type="hidden" name="formToken" value="">
+        <input type="hidden" name="productId" value="[[p:productId]]">
+        <div class="sf-hp" aria-hidden="true"><label for="inq_website">{{f.hp}}</label><input id="inq_website" name="website" tabindex="-1" autocomplete="off"></div>
+        <div class="sf-grid">
+          <div class="sf-field" data-field="name"><label for="inq_name">{{fi.name}}</label><input id="inq_name" name="name" autocomplete="name" maxlength="100" required><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="phone"><label for="inq_phone">{{fi.phone}} <small>{{fi.orEmail}}</small></label><input id="inq_phone" name="phone" type="tel" dir="ltr" autocomplete="tel" maxlength="30" placeholder="+963…"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="email"><label for="inq_email">{{f.email}} <small>{{f.optional}}</small></label><input id="inq_email" name="email" type="email" dir="ltr" autocomplete="email" maxlength="254"><div class="sf-err"></div></div>
+        </div>
+        <div class="sf-field" data-field="message"><label for="inq_message">{{fi.message}}</label><textarea id="inq_message" name="message" rows="4" minlength="5" maxlength="2000" required placeholder="{{fi.placeholder}}"></textarea><div class="sf-err"></div></div>
+      </div>
+      <div class="sf-foot"><span class="sf-note">{{fi.note}}</span><button class="btn btn-primary" type="submit">{{fi.submit}}</button></div>
+    </form>
+    <div class="sf-done" hidden>
+      <div class="tick" aria-hidden="true">✓</div><h3>{{fi.doneTitle}}</h3><p>{{fi.doneText}}</p><button class="btn btn-primary" type="button" data-close>{{f.close}}</button>
+    </div>
+  </dialog>
+
+  <!-- Distribution request dialog -->
+  <dialog class="sf-dlg" id="distributionDlg" aria-labelledby="distributionTitle">
+    <form class="sf-form" data-form="distribution" novalidate>
+      <div class="sf-head"><h3 id="distributionTitle">{{fd.title}}</h3><button class="sf-x" type="button" data-close aria-label="{{f.closeAria}}">×</button></div>
+      <p class="sf-lead">{{fd.lead}}</p>
+      <div class="sf-body">
+        <div class="sf-alert" role="alert" aria-live="polite" hidden></div>
+        <input type="hidden" name="formToken" value="">
+        <div class="sf-hp" aria-hidden="true"><label for="dist_website">{{f.hp}}</label><input id="dist_website" name="website" tabindex="-1" autocomplete="off"></div>
+        <div class="sf-grid">
+          <div class="sf-field" data-field="name"><label for="dist_name">{{fd.name}}</label><input id="dist_name" name="name" autocomplete="name" maxlength="100" required><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="businessName"><label for="dist_business">{{fd.business}}</label><input id="dist_business" name="businessName" autocomplete="organization" maxlength="150" required><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="phone"><label for="dist_phone">{{fd.phone}}</label><input id="dist_phone" name="phone" type="tel" dir="ltr" autocomplete="tel" maxlength="30" required placeholder="+963…"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="whatsapp"><label for="dist_whatsapp">{{fd.whatsapp}} <small>{{f.optional}}</small></label><input id="dist_whatsapp" name="whatsapp" type="tel" dir="ltr" maxlength="30" placeholder="+963…"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="email"><label for="dist_email">{{f.email}} <small>{{f.optional}}</small></label><input id="dist_email" name="email" type="email" dir="ltr" autocomplete="email" maxlength="254"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="businessType"><label for="dist_type">{{fd.type}}</label><select id="dist_type" name="businessType" required><option value="">{{fd.choose}}</option><option value="shop">{{bt.shop}}</option><option value="distributor">{{bt.distributor}}</option><option value="wholesaler">{{bt.wholesaler}}</option><option value="restaurant">{{bt.restaurant}}</option><option value="supermarket">{{bt.supermarket}}</option><option value="other">{{bt.other}}</option></select><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="city"><label for="dist_city">{{f.city}} <small>{{f.optional}}</small></label><input id="dist_city" name="city" maxlength="100" autocomplete="address-level2"><div class="sf-err"></div></div>
+          <div class="sf-field" data-field="area"><label for="dist_area">{{f.area}} <small>{{f.optional}}</small></label><input id="dist_area" name="area" maxlength="100" autocomplete="address-level3"><div class="sf-err"></div></div>
+        </div>
+        <div class="sf-field" data-field="message"><label for="dist_message">{{fd.details}} <small>{{f.optional}}</small></label><textarea id="dist_message" name="message" rows="3" maxlength="2000" placeholder="{{fd.placeholder}}"></textarea><div class="sf-err"></div></div>
+      </div>
+      <div class="sf-foot"><span class="sf-note">{{fd.note}}</span><button class="btn btn-primary" type="submit">{{fd.submit}}</button></div>
+    </form>
+    <div class="sf-done" hidden>
+      <div class="tick" aria-hidden="true">✓</div><h3>{{fd.doneTitle}}</h3><p>{{fd.doneText}}</p><button class="btn btn-primary" type="button" data-close>{{f.close}}</button>
+    </div>
+  </dialog>
+
+  <script type="application/json" id="sf-i18n">{{{client.json}}}</script>
+  <script src="/js/main.js"></script>
+  <script src="/js/forms.js"></script>
+  <script src="/js/cart.js"></script>
+  <script src="/js/product-scroll-cue.js" defer></script>
+  <div class="pd-scroll-cue-end" data-scroll-cue-end aria-hidden="true"></div>
+</body>
+</html>

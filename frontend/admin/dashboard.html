@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>لوحة التحكم | شنانة فودز</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+  <link rel="stylesheet" href="/admin/dashboard-activity.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar" aria-label="القائمة الجانبية">
+      <div class="side-brand"><strong>شنانة فودز</strong><span>لوحة الإدارة</span></div>
+      <nav class="side-nav">
+        <a class="nav-item active" aria-current="page" href="/admin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>
+          لوحة التحكم
+        </a>
+        <a class="nav-item" href="/admin/products">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg>
+          المنتجات
+        </a>
+        <a class="nav-item" href="/admin/categories">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12 12 20l-9-9V3h8l9 9Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>
+          التصنيفات
+        </a>
+<a class="nav-item" href="/admin/purchase-orders"><span class="nav-symbol" aria-hidden="true">&#128722;</span> &#1591;&#1604;&#1576;&#1575;&#1578; &#1575;&#1604;&#1588;&#1585;&#1575;&#1569;</a>
+      <a class="nav-item" href="/admin/inquiries"><span class="nav-symbol" aria-hidden="true">✉</span> الاستفسارات</a>
+<a class="nav-item" href="/admin/distribution"><span class="nav-symbol" aria-hidden="true">▣</span> طلبات التوزيع</a>
+      </nav>
+      <div class="side-foot">
+        <a class="nav-item" href="/" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+          عرض الموقع
+        </a>
+        <button class="nav-item" id="logoutBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          تسجيل الخروج
+        </button>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="فتح القائمة" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <h1>لوحة التحكم</h1>
+        <div class="user-chip">
+          <div class="who"><b id="userName">…</b><small id="userEmail" dir="ltr"></small></div>
+          <div class="avatar" id="avatar" aria-hidden="true">·</div>
+        </div>
+      </header>
+
+      <main class="content">
+        <h2 class="greeting" id="greeting">مرحبًا</h2>
+        <p class="greeting-sub">نظرة سريعة على محتوى الموقع والطلبات الواردة، مع إمكانية متابعة الاستفسارات وطلبات التوزيع.</p>
+        <div class="alert" id="pageError" role="alert" hidden></div>
+
+        <section class="stats" aria-label="إحصاءات">
+          <article class="stat loading" id="stat-products">
+            <div class="ico red"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg></div>
+            <div class="label">المنتجات</div><div class="num">0</div><div class="meta">…</div>
+          </article>
+          <article class="stat loading" id="stat-categories">
+            <div class="ico olive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12 12 20l-9-9V3h8l9 9Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg></div>
+            <div class="label">التصنيفات</div><div class="num">0</div><div class="meta">…</div>
+          </article>
+          <article class="stat loading" id="stat-inquiries">
+            <div class="ico gold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg></div>
+            <div class="label">الاستفسارات</div><div class="num">0</div><div class="meta">…</div>
+          </article>
+          <article class="stat loading" id="stat-distributionRequests">
+            <div class="ico rose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg></div>
+            <div class="label">طلبات التوزيع</div><div class="num">0</div><div class="meta">…</div>
+          </article>
+        </section>
+
+        <section class="activity-grid" aria-label="متابعة الطلبات الواردة">
+          <section class="panel activity-panel" aria-labelledby="recent-inquiries-title">
+            <div class="activity-head">
+              <div>
+                <h2 id="recent-inquiries-title">أحدث الاستفسارات</h2>
+                <p>آخر الرسائل الواردة من زوار الموقع.</p>
+              </div>
+              <a class="activity-all" href="/admin/inquiries">عرض الكل <span aria-hidden="true">←</span></a>
+            </div>
+            <div class="activity-list" id="recentInquiries" aria-live="polite" aria-busy="true">
+              <p class="activity-state">جارٍ تحميل الاستفسارات…</p>
+            </div>
+          </section>
+
+          <section class="panel activity-panel" aria-labelledby="recent-distribution-title">
+            <div class="activity-head">
+              <div>
+                <h2 id="recent-distribution-title">أحدث طلبات التوزيع</h2>
+                <p>تابع طلبات المحلات والموزعين وتجار الجملة.</p>
+              </div>
+              <a class="activity-all" href="/admin/distribution">عرض الكل <span aria-hidden="true">←</span></a>
+            </div>
+            <div class="activity-list" id="recentDistribution" aria-live="polite" aria-busy="true">
+              <p class="activity-state">جارٍ تحميل طلبات التوزيع…</p>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="/admin/dashboard.js" defer></script>
+  <script src="/admin/dashboard-activity.js" defer></script>
+</body>
+</html>

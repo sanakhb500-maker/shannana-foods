@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>المنتجات | شنانة فودز</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+  <div class="app" id="app">
+    <aside class="sidebar" id="sidebar" aria-label="القائمة الجانبية">
+      <div class="side-brand"><strong>شنانة فودز</strong><span>لوحة الإدارة</span></div>
+      <nav class="side-nav">
+        <a class="nav-item" href="/admin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg>
+          لوحة التحكم
+        </a>
+        <a class="nav-item active" aria-current="page" href="/admin/products">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/></svg>
+          المنتجات
+        </a>
+        <a class="nav-item" href="/admin/categories">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12 12 20l-9-9V3h8l9 9Z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>
+          التصنيفات
+        </a>
+        <a class="nav-item" href="/admin/inquiries">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></svg>
+          الاستفسارات
+        </a>
+        <a class="nav-item" href="/admin/distribution">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg>
+          طلبات التوزيع
+        </a>
+      </nav>
+      <div class="side-foot">
+        <a class="nav-item" href="/" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+          عرض الموقع
+        </a>
+        <button class="nav-item" id="logoutBtn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          تسجيل الخروج
+        </button>
+      </div>
+    </aside>
+    <div class="scrim" id="scrim"></div>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="فتح القائمة" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <h1>المنتجات</h1>
+        <div class="user-chip">
+          <div class="who"><b id="userName">…</b><small id="userEmail" dir="ltr"></small></div>
+          <div class="avatar" id="avatar" aria-hidden="true">·</div>
+        </div>
+      </header>
+
+      <main class="content">
+        <div class="page-head">
+          <div><h2 class="greeting">إدارة المنتجات</h2><p class="greeting-sub">أضف المنتجات وعدّلها وغيّر صورها. التعطيل يخفي المنتج من الموقع دون حذفه.</p></div>
+          <button class="btn btn-primary" id="newBtn" type="button">+ منتج جديد</button>
+        </div>
+        <div class="toolbar">
+          <input id="search" type="search" placeholder="بحث بالاسم أو الوصف…" maxlength="100" aria-label="بحث" />
+          <select id="fCategory" aria-label="التصنيف"><option value="">كل التصنيفات</option></select>
+          <select id="fStatus" aria-label="الحالة"><option value="all">كل الحالات</option><option value="active">نشط</option><option value="inactive">معطّل</option></select>
+          <span class="count" id="count" aria-live="polite"></span>
+        </div>
+        <div class="alert" id="pageError" role="alert" hidden></div>
+        <div class="table-wrap">
+          <table class="tbl" id="tbl">
+            <thead><tr><th>الصورة</th><th>المنتج</th><th>التصنيف</th><th>اللون</th><th>الترتيب</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+          <div class="empty" id="empty" hidden>لا توجد منتجات مطابقة.</div>
+          <div class="empty" id="loading">جارٍ التحميل…</div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <dialog class="dlg" id="dlg" aria-labelledby="dlgTitle">
+    <form id="pForm" novalidate>
+      <div class="dlg-head"><h3 id="dlgTitle">منتج</h3><button type="button" class="x" id="dlgClose" aria-label="إغلاق">×</button></div>
+      <div class="dlg-body">
+        <div class="form-error" id="formError" role="alert" hidden></div>
+        <div class="field" data-field="image">
+          <label for="f_image">صورة المنتج</label>
+          <div class="img-compare">
+            <figure id="curFig" hidden><div class="img-box"><img id="curImg" alt="الصورة الحالية" /></div><figcaption>الصورة الحالية</figcaption></figure>
+            <figure id="newFig" hidden><div class="img-box"><img id="newImg" alt="معاينة الصورة الجديدة" /></div><figcaption id="newCap">الصورة الجديدة — لن تُحفظ إلا بعد الضغط على «حفظ»</figcaption></figure>
+            <div class="img-empty" id="noImg">لم تُختر صورة بعد</div>
+          </div>
+          <input id="f_image" name="image" type="file" accept="image/png,image/jpeg,image/webp" />
+          <div class="hint">JPEG أو PNG أو WebP، حتى 8 ميغابايت، من 300×300 إلى 8000×8000 بكسل. يُفضَّل PNG بخلفية شفافة.</div>
+          <div class="ferr"></div>
+        </div>
+        <div class="grid2">
+          <div class="field" data-field="name"><label for="f_name">اسم المنتج بالعربية</label><input id="f_name" name="name" maxlength="150" required /><div class="ferr"></div></div>
+          <div class="field" data-field="nameEn"><label for="f_nameEn">اسم المنتج بالإنجليزية (اختياري)</label><input id="f_nameEn" name="nameEn" maxlength="150" dir="ltr" lang="en" autocomplete="off" placeholder="Product name" /><div class="hint">إذا تركته فارغًا، سيُعرض الاسم العربي في الموقع الإنجليزي.</div><div class="ferr"></div></div>
+          <div class="field" data-field="slug"><label for="f_slug">المعرّف (slug)</label><input id="f_slug" name="slug" dir="ltr" maxlength="100" placeholder="يُولَّد تلقائيًا إن تُرك فارغًا" /><div class="hint" id="slugHint">إنجليزي صغير وأرقام وشرطات. لا يتغيّر بعد الإنشاء.</div><div class="ferr"></div></div>
+          <div class="field" data-field="categoryId"><label for="f_cat">التصنيف</label><select id="f_cat" name="categoryId" required></select><div class="ferr"></div></div>
+          <div class="field" data-field="tone"><label for="f_tone">لون الخلفية</label><select id="f_tone" name="tone"><option value="red">أحمر</option><option value="gold">ذهبي</option><option value="rose">وردي</option><option value="green">أخضر</option></select><div class="ferr"></div></div>
+          <div class="field" data-field="sortOrder"><label for="f_order">الترتيب</label><input id="f_order" name="sortOrder" type="number" min="0" max="1000000" dir="ltr" placeholder="تلقائي" /><div class="hint">الأصغر يظهر أولًا.</div><div class="ferr"></div></div>
+          <div class="field checks"><label class="chk"><input id="f_active" type="checkbox" /> نشط (ظاهر في الموقع)</label><label class="chk"><input id="f_feat" type="checkbox" /> منتج مميّز</label></div>
+        </div>
+        <div class="field" data-field="description"><label for="f_desc">الوصف بالعربية</label><textarea id="f_desc" name="description" rows="3" maxlength="2000"></textarea><div class="ferr"></div></div>
+        <div class="field" data-field="descriptionEn"><label for="f_descEn">الوصف بالإنجليزية (اختياري)</label><textarea id="f_descEn" name="descriptionEn" rows="3" maxlength="2000" dir="ltr" lang="en" placeholder="Product description"></textarea><div class="hint">إذا تركته فارغًا، سيُعرض الوصف العربي في الموقع الإنجليزي.</div><div class="ferr"></div></div>
+        <section class="specification-sections" aria-labelledby="specificationsTitle">
+          <div class="specification-heading">
+            <h4 id="specificationsTitle">مواصفات المنتج</h4>
+            <p>جميع الحقول اختيارية. أدخل المعلومات المؤكدة فقط، واترك غير المتوفر فارغًا.</p>
+          </div>
+
+          <details class="spec-group" data-spec-section>
+            <summary><span>1. معلومات العبوة</span><small>الحجم، نوع العبوة، المادة والباركود</small></summary>
+            <div class="spec-fields grid2">
+              <div class="field" data-field="netContent"><label for="f_netContent">المحتوى الصافي</label><input id="f_netContent" name="netContent" data-spec-field type="text" inputmode="decimal" dir="ltr" maxlength="12" placeholder="مثال: 500 أو 0.750"><div class="hint">أدخل القيمة الرقمية فقط، دون الوحدة.</div><div class="ferr"></div></div>
+              <div class="field" data-field="netContentUnit"><label for="f_netContentUnit">وحدة المحتوى الصافي</label><select id="f_netContentUnit" name="netContentUnit" data-spec-field><option value="">اختر الوحدة</option><option value="g">غرام (g)</option><option value="kg">كيلوغرام (kg)</option><option value="ml">ملليلتر (ml)</option><option value="l">لتر (l)</option></select><div class="ferr"></div></div>
+              <div class="field" data-field="packType"><label for="f_packType">نوع العبوة بالعربية</label><input id="f_packType" name="packType" data-spec-field maxlength="80" placeholder="مثال: عبوة ضغط"><div class="ferr"></div></div>
+              <div class="field" data-field="packTypeEn"><label for="f_packTypeEn">نوع العبوة بالإنجليزية</label><input id="f_packTypeEn" name="packTypeEn" data-spec-field maxlength="80" dir="ltr" lang="en" placeholder="e.g. Squeeze bottle"><div class="ferr"></div></div>
+              <div class="field" data-field="packMaterial"><label for="f_packMaterial">مادة العبوة بالعربية</label><input id="f_packMaterial" name="packMaterial" data-spec-field maxlength="80" placeholder="مثال: بلاستيك"><div class="ferr"></div></div>
+              <div class="field" data-field="packMaterialEn"><label for="f_packMaterialEn">مادة العبوة بالإنجليزية</label><input id="f_packMaterialEn" name="packMaterialEn" data-spec-field maxlength="80" dir="ltr" lang="en" placeholder="e.g. PET"><div class="ferr"></div></div>
+              <div class="field" data-field="barcode"><label for="f_barcode">الباركود</label><input id="f_barcode" name="barcode" data-spec-field type="text" inputmode="numeric" dir="ltr" maxlength="14" autocomplete="off" placeholder="8 أو 12–14 رقمًا"><div class="hint">يُحفظ كنص للحفاظ على الأصفار في بداية الباركود.</div><div class="ferr"></div></div>
+            </div>
+          </details>
+
+          <details class="spec-group" data-spec-section>
+            <summary><span>2. معلومات الكرتونة</span><small>عدد العبوات، الأبعاد والأوزان</small></summary>
+            <div class="spec-fields grid2">
+              <div class="field" data-field="cartonUnits"><label for="f_cartonUnits">عدد العبوات في الكرتونة</label><input id="f_cartonUnits" name="cartonUnits" data-spec-field type="number" min="1" max="2147483647" step="1" inputmode="numeric"><div class="ferr"></div></div>
+              <div class="field" data-field="cartonLengthCm"><label for="f_cartonLengthCm">طول الكرتونة (سم)</label><input id="f_cartonLengthCm" name="cartonLengthCm" data-spec-field type="text" inputmode="decimal" dir="ltr" maxlength="8" placeholder="سم"><div class="ferr"></div></div>
+              <div class="field" data-field="cartonWidthCm"><label for="f_cartonWidthCm">عرض الكرتونة (سم)</label><input id="f_cartonWidthCm" name="cartonWidthCm" data-spec-field type="text" inputmode="decimal" dir="ltr" maxlength="8" placeholder="سم"><div class="ferr"></div></div>
+              <div class="field" data-field="cartonHeightCm"><label for="f_cartonHeightCm">ارتفاع الكرتونة (سم)</label><input id="f_cartonHeightCm" name="cartonHeightCm" data-spec-field type="text" inputmode="decimal" dir="ltr" maxlength="8" placeholder="سم"><div class="ferr"></div></div>
+              <div class="field" data-field="cartonNetWeightKg"><label for="f_cartonNetWeightKg">الوزن الصافي للكرتونة (كغ)</label><input id="f_cartonNetWeightKg" name="cartonNetWeightKg" data-spec-field type="text" inputmode="decimal" dir="ltr" maxlength="9" placeholder="كغ"><div class="ferr"></div></div>
+              <div class="field" data-field="cartonGrossWeightKg"><label for="f_cartonGrossWeightKg">الوزن الإجمالي للكرتونة (كغ)</label><input id="f_cartonGrossWeightKg" name="cartonGrossWeightKg" data-spec-field type="text" inputmode="decimal" dir="ltr" maxlength="9" placeholder="كغ"><div class="hint">يجب ألا يقل عن الوزن الصافي.</div><div class="ferr"></div></div>
+            </div>
+            <p class="spec-note">يجب إدخال أبعاد الكرتونة الثلاثة معًا، وبالسنتيمتر.</p>
+          </details>
+
+          <details class="spec-group" data-spec-section>
+            <summary><span>3. الصلاحية والتخزين</span><small>مدة الصلاحية وتعليمات التخزين</small></summary>
+            <div class="spec-fields grid2">
+              <div class="field" data-field="shelfLifeValue"><label for="f_shelfLifeValue">مدة الصلاحية</label><input id="f_shelfLifeValue" name="shelfLifeValue" data-spec-field type="number" min="1" max="2147483647" step="1" inputmode="numeric"></div>
+              <div class="field" data-field="shelfLifeUnit"><label for="f_shelfLifeUnit">وحدة مدة الصلاحية</label><select id="f_shelfLifeUnit" name="shelfLifeUnit" data-spec-field><option value="">اختر الوحدة</option><option value="day">يوم</option><option value="month">شهر</option><option value="year">سنة</option></select><div class="ferr"></div></div>
+              <div class="field" data-field="storageNote"><label for="f_storageNote">تعليمات التخزين بالعربية</label><textarea id="f_storageNote" name="storageNote" data-spec-field rows="3" maxlength="2000"></textarea><div class="ferr"></div></div>
+              <div class="field" data-field="storageNoteEn"><label for="f_storageNoteEn">تعليمات التخزين بالإنجليزية</label><textarea id="f_storageNoteEn" name="storageNoteEn" data-spec-field rows="3" maxlength="2000" dir="ltr" lang="en"></textarea><div class="ferr"></div></div>
+            </div>
+          </details>
+
+          <details class="spec-group" data-spec-section>
+            <summary><span>4. التصدير واللوجستيات</span><small>بلد المنشأ، الرمز الجمركي والطبلية</small></summary>
+            <div class="spec-fields grid2">
+              <div class="field" data-field="originCountry"><label for="f_originCountry">رمز بلد المنشأ (ISO-2)</label><input id="f_originCountry" name="originCountry" data-spec-field type="text" maxlength="2" minlength="2" dir="ltr" lang="en" autocapitalize="characters" placeholder="SY"><div class="hint">حرفان إنجليزيان، مثل SY.</div><div class="ferr"></div></div>
+              <div class="field" data-field="hsCode"><label for="f_hsCode">رمز HS الجمركي</label><input id="f_hsCode" name="hsCode" data-spec-field type="text" inputmode="numeric" maxlength="10" dir="ltr" placeholder="6–10 أرقام"><div class="ferr"></div></div>
+              <div class="field" data-field="palletCartons"><label for="f_palletCartons">عدد الكراتين على الطبلية</label><input id="f_palletCartons" name="palletCartons" data-spec-field type="number" min="1" max="2147483647" step="1" inputmode="numeric"><div class="ferr"></div></div>
+              <div class="field" data-field="palletCartonsPerLayer"><label for="f_palletCartonsPerLayer">عدد الكراتين في الطبقة</label><input id="f_palletCartonsPerLayer" name="palletCartonsPerLayer" data-spec-field type="number" min="1" max="2147483647" step="1" inputmode="numeric"><div class="hint">لا يمكن أن يتجاوز إجمالي كراتين الطبلية.</div><div class="ferr"></div></div>
+              <div class="field" data-field="exportNote"><label for="f_exportNote">ملاحظات التصدير بالعربية</label><textarea id="f_exportNote" name="exportNote" data-spec-field rows="3" maxlength="2000"></textarea><div class="ferr"></div></div>
+              <div class="field" data-field="exportNoteEn"><label for="f_exportNoteEn">ملاحظات التصدير بالإنجليزية</label><textarea id="f_exportNoteEn" name="exportNoteEn" data-spec-field rows="3" maxlength="2000" dir="ltr" lang="en"></textarea><div class="ferr"></div></div>
+            </div>
+          </details>
+        </section>
+      </div>
+      <div class="dlg-foot"><button type="button" class="btn btn-ghost" id="cancelBtn">إلغاء</button><button type="submit" class="btn btn-primary" id="saveBtn">حفظ</button></div>
+    </form>
+  </dialog>
+  <script src="/admin/admin-common.js" defer></script>
+  <script src="/admin/products.js" defer></script>
+</body>
+</html>
