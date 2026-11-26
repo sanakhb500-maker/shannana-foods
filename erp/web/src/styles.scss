@@ -1,0 +1,175 @@
+// Shannana ERP — global styles. Logical properties (inline-start/end) keep RTL and LTR symmetrical.
+
+:root {
+  --bg: #f5f3ef;
+  --surface: #ffffff;
+  --surface-2: #faf8f5;
+  --text: #1f1d1a;
+  --muted: #6c675f;
+  --border: #e3ded6;
+  --primary: #7a1f2b;      // burgundy, matches the brand
+  --primary-contrast: #ffffff;
+  --accent: #6b7a3a;       // olive
+  --danger: #b3261e;
+  --ok: #2e7d32;
+  --shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 4px 14px rgb(0 0 0 / 5%);
+  --radius: 10px;
+  --sidebar-w: 220px;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #15130f;
+  --surface: #1e1b16;
+  --surface-2: #26221c;
+  --text: #f0ece4;
+  --muted: #a39d92;
+  --border: #38332b;
+  --primary: #c9586a;
+  --primary-contrast: #1a0b0e;
+  --accent: #a3b45c;
+  --danger: #f2877f;
+  --ok: #7ccf82;
+  --shadow: none;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Cairo', system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+h1 { font-size: 1.5rem; margin: 0; }
+h2 { font-size: 1.15rem; margin: 0 0 1rem; }
+
+button, input, select, textarea { font: inherit; color: inherit; }
+
+.spacer { flex: 1; }
+
+// ---------- buttons ----------
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+  padding: .5rem .95rem; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); cursor: pointer; transition: background .15s, border-color .15s;
+  &:hover:not(:disabled) { background: var(--surface-2); border-color: var(--muted); }
+  &:disabled { opacity: .55; cursor: not-allowed; }
+  &:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  &.primary { background: var(--primary); color: var(--primary-contrast); border-color: var(--primary); &:hover:not(:disabled) { filter: brightness(1.08); background: var(--primary); } }
+  &.danger { color: var(--danger); }
+  &.sm { padding: .25rem .65rem; font-size: .85rem; }
+  &.block { width: 100%; }
+}
+
+// ---------- form controls ----------
+.input {
+  width: 100%; padding: .5rem .7rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  &:focus { outline: 2px solid var(--primary); outline-offset: 0; border-color: transparent; }
+  &:disabled { background: var(--surface-2); color: var(--muted); }
+}
+textarea.input { resize: vertical; }
+
+.field { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .9rem;
+  label { font-size: .85rem; color: var(--muted); }
+  .err { color: var(--danger); }
+  .hint { color: var(--muted); }
+}
+.req { color: var(--danger); }
+.check { display: inline-flex; align-items: center; gap: .45rem; cursor: pointer; font-size: .9rem; color: var(--text) !important; }
+
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem;
+  .wide { grid-column: 1 / -1; }
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+.chip { display: inline-flex; align-items: center; gap: .4rem; padding: .25rem .7rem; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; font-size: .85rem; color: var(--text) !important;
+  input { accent-color: var(--primary); }
+  &.on { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+}
+
+// ---------- cards / tables ----------
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.pad { padding: 1.25rem; }
+
+.page-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.page-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; .input { width: 220px; } }
+
+.table-wrap { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: .92rem;
+  th, td { padding: .65rem .7rem; text-align: start; border-bottom: 1px solid var(--border); }
+  th, td:first-child { white-space: nowrap; }
+  th { font-weight: 600; font-size: .8rem; color: var(--muted); background: var(--surface-2); }
+  tbody tr:hover { background: var(--surface-2); }
+  tr.inactive td { color: var(--muted); }
+  tbody tr:last-child td { border-bottom: 0; }
+  .actions { text-align: end; white-space: nowrap; .btn + .btn { margin-inline-start: .25rem; } .btn.sm { padding: .2rem .5rem; font-size: .8rem; } }
+  .empty { text-align: center; color: var(--muted); padding: 2rem; }
+}
+
+.badge { display: inline-block; padding: .1rem .55rem; border-radius: 999px; font-size: .75rem; background: var(--surface-2); border: 1px solid var(--border); margin-inline-end: .25rem;
+  &.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+  &.muted { color: var(--muted); }
+}
+
+.pager { display: flex; align-items: center; gap: .6rem; margin-top: .8rem; color: var(--muted); font-size: .9rem; }
+
+.alert { padding: .65rem .9rem; border-radius: 8px; margin-bottom: .9rem; border: 1px solid;
+  &.error { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 50%, transparent); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+}
+
+// ---------- modal ----------
+.modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 45%); display: flex; align-items: flex-start; justify-content: center; padding: 4vh 1rem; overflow-y: auto; z-index: 50; }
+.modal { width: min(680px, 100%); padding: 1.4rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .5rem; }
+
+// ---------- login ----------
+.login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
+.login { width: min(400px, 100%); padding: 1.6rem;
+  .login-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; h1 { font-size: 1.2rem; color: var(--primary); } }
+}
+
+// ---------- shell ----------
+.shell { display: grid; grid-template-columns: var(--sidebar-w) 1fr; min-height: 100vh; }
+
+.sidebar { background: var(--surface); border-inline-end: 1px solid var(--border); padding: 1rem .75rem; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  .brand { font-weight: 700; font-size: 1.1rem; color: var(--primary); padding: .25rem .6rem 1rem; }
+  nav { display: flex; flex-direction: column; gap: 2px;
+    a { padding: .5rem .75rem; border-radius: 8px; color: var(--text); text-decoration: none;
+      &:hover { background: var(--surface-2); }
+      &.active { background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); font-weight: 600; }
+    }
+  }
+  .nav-group { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: .9rem .75rem .3rem; }
+}
+
+.main { display: flex; flex-direction: column; min-width: 0; }
+.topbar { display: flex; align-items: center; gap: .5rem; padding: .6rem 1.25rem; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+  .user { color: var(--muted); font-size: .88rem; margin-inline: .4rem; }
+  .menu-btn { display: none; }
+}
+.content { padding: 1.25rem; max-width: 1280px; width: 100%; }
+.scrim { display: none; }
+
+.roadmap { list-style: none; padding: 0; margin: .5rem 0 0;
+  li { display: flex; align-items: center; justify-content: space-between; padding: .6rem 0; border-bottom: 1px solid var(--border); &:last-child { border-bottom: 0; } }
+}
+
+// ---------- responsive ----------
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .sidebar { position: fixed; inset-block: 0; inset-inline-start: 0; width: var(--sidebar-w); z-index: 40; transform: translateX(-105%); transition: transform .2s;
+    [dir='rtl'] & { transform: translateX(105%); }
+  }
+  .nav-open .sidebar { transform: none; }
+  .nav-open .scrim { display: block; position: fixed; inset: 0; background: rgb(0 0 0 / 40%); z-index: 30; }
+  .topbar .menu-btn { display: inline-flex; }
+  .form-grid { grid-template-columns: 1fr; }
+  .page-tools .input { width: 100%; }
+}

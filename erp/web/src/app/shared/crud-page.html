@@ -1,0 +1,136 @@
+<header class="page-head">
+  <h1>{{ i18n.t(cfg.title) }}</h1>
+  <div class="page-tools">
+    @if (cfg.searchable !== false) {
+      <input class="input" type="search" [placeholder]="i18n.t('common.search')" [(ngModel)]="search" (input)="onSearch()" />
+    }
+    <label class="check"><input type="checkbox" [(ngModel)]="showInactive" (change)="toggleInactive()" /> {{ i18n.t('common.showInactive') }}</label>
+    @if (canWrite) {
+      <button class="btn primary" type="button" (click)="openNew()">+ {{ i18n.t('common.add') }}</button>
+    } @else {
+      <span class="badge muted">{{ i18n.t('common.readOnly') }}</span>
+    }
+  </div>
+</header>
+
+@if (message() && !editing()) {
+  <div class="alert error">{{ message() }}</div>
+}
+
+<div class="card table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        @for (f of columns; track f.key) {
+          <th>{{ i18n.t(f.label) }}</th>
+        }
+        <th>{{ i18n.t('common.status') }}</th>
+        @if (canWrite) {
+          <th class="actions">{{ i18n.t('common.actions') }}</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      @for (row of rows(); track row.id) {
+        <tr [class.inactive]="!row.isActive">
+          @for (f of columns; track f.key) {
+            <td>{{ cell(row, f) }}</td>
+          }
+          <td>
+            <span class="badge" [class.ok]="row.isActive" [class.muted]="!row.isActive">
+              {{ i18n.t(row.isActive ? 'common.active' : 'common.inactive') }}
+            </span>
+          </td>
+          @if (canWrite) {
+            <td class="actions">
+              <button class="btn sm" type="button" (click)="openEdit(row)">{{ i18n.t('common.edit') }}</button>
+              @if (row.isActive) {
+                <button class="btn sm danger" type="button" (click)="setActive(row, false)">{{ i18n.t('common.deactivate') }}</button>
+              } @else {
+                <button class="btn sm" type="button" (click)="setActive(row, true)">{{ i18n.t('common.activate') }}</button>
+              }
+            </td>
+          }
+        </tr>
+      } @empty {
+        <tr>
+          <td class="empty" [attr.colspan]="columns.length + 2">
+            {{ i18n.t(loading() ? 'common.loading' : 'common.empty') }}
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+<footer class="pager">
+  <span>{{ i18n.t('common.total') }}: {{ total() }}</span>
+  <span class="spacer"></span>
+  <button class="btn sm" type="button" [disabled]="page() <= 1" (click)="go(-1)">{{ i18n.t('common.prev') }}</button>
+  <span>{{ page() }} / {{ pages() }}</span>
+  <button class="btn sm" type="button" [disabled]="page() >= pages()" (click)="go(1)">{{ i18n.t('common.next') }}</button>
+</footer>
+
+@if (editing()) {
+  <div class="modal-backdrop" (click)="close()">
+    <form class="modal card" (click)="$event.stopPropagation()" (ngSubmit)="save()" #form="ngForm" novalidate>
+      <h2>{{ i18n.t(isNew ? 'common.add' : 'common.edit') }} — {{ i18n.t(cfg.title) }}</h2>
+
+      @if (message()) {
+        <div class="alert error">{{ message() }}</div>
+      }
+
+      <div class="form-grid">
+        @for (f of cfg.fields; track f.key) {
+          <div class="field" [class.wide]="f.type === 'textarea'">
+            @if (f.type === 'checkbox') {
+              <label class="check">
+                <input type="checkbox" [name]="f.key" [(ngModel)]="model[f.key]" [disabled]="!isNew && !!f.lockedOnEdit" />
+                {{ i18n.t(f.label) }}
+              </label>
+            } @else {
+              <label [for]="'f-' + f.key">{{ i18n.t(f.label) }} @if (f.required) {<span class="req">*</span>}</label>
+              @switch (f.type) {
+                @case ('select') {
+                  <select class="input" [id]="'f-' + f.key" [name]="f.key" [(ngModel)]="model[f.key]" [required]="!!f.required"
+                          [disabled]="!isNew && !!f.lockedOnEdit">
+                    @if (f.nullable) {
+                      <option [ngValue]="null">{{ i18n.t('common.none') }}</option>
+                    } @else {
+                      <option [ngValue]="undefined" disabled>{{ i18n.t('common.select') }}</option>
+                    }
+                    @if (f.lookup) {
+                      @for (o of lookupOptions(f); track o.id) {
+                        <option [ngValue]="o.id">{{ i18n.name(o) || o.code || o.plateNumber }}</option>
+                      }
+                    } @else {
+                      @for (o of f.options; track o.value) {
+                        <option [ngValue]="o.value">{{ i18n.t(o.label) }}</option>
+                      }
+                    }
+                  </select>
+                }
+                @case ('textarea') {
+                  <textarea class="input" rows="2" [id]="'f-' + f.key" [name]="f.key" [(ngModel)]="model[f.key]" [attr.maxlength]="f.maxlength"></textarea>
+                }
+                @default {
+                  <input class="input" [id]="'f-' + f.key" [name]="f.key" [type]="f.type" [step]="f.step ?? null"
+                         [(ngModel)]="model[f.key]" [required]="!!f.required" [attr.maxlength]="f.maxlength"
+                         [disabled]="!isNew && !!f.lockedOnEdit" [attr.dir]="f.type === 'email' || f.key === 'code' ? 'ltr' : null" />
+                }
+              }
+            }
+            @if (fieldError(f.key)) {
+              <small class="err">{{ fieldError(f.key) }}</small>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" type="button" (click)="close()">{{ i18n.t('common.cancel') }}</button>
+        <button class="btn primary" type="submit" [disabled]="saving()">{{ i18n.t('common.save') }}</button>
+      </div>
+    </form>
+  </div>
+}

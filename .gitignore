@@ -30,3 +30,12 @@ Thumbs.db
 # Local phase backups - do not upload
 *.phase*-backup
 *.old
+
+# ERP (erp/) - .NET and Angular build output
+erp/**/bin/
+erp/**/obj/
+erp/src/Erp.Api/wwwroot/
+erp/web/node_modules/
+erp/web/.angular/
+erp/**/appsettings.*.local.json
+*.user
