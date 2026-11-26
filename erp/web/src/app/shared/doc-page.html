@@ -1,0 +1,194 @@
+<header class="page-head">
+  <h1>{{ i18n.t(cfg.title) }}</h1>
+  <div class="page-tools">
+    @if (cfg.filters.includes('supplier')) {
+      <select class="input" [(ngModel)]="supplierFilter" (ngModelChange)="reload()">
+        <option [ngValue]="null">{{ i18n.t('pur.allSuppliers') }}</option>
+        @for (s of lookups.suppliers(); track s.id) {
+          <option [ngValue]="s.id">{{ lookups.supplierLabel(s.id) }}</option>
+        }
+      </select>
+    }
+    <select class="input" [(ngModel)]="status" (ngModelChange)="reload()">
+      <option value="">{{ i18n.t('inv.allStatuses') }}</option>
+      @for (s of statuses; track s) {
+        <option [value]="s">{{ i18n.t('status.' + s) }}</option>
+      }
+    </select>
+    @if (cfg.filters.includes('pending')) {
+      <label class="check"><input type="checkbox" [(ngModel)]="pendingOnly" (change)="reload()" /> {{ i18n.t('pur.awaitingReceipt') }}</label>
+    }
+    @if (canWrite) {
+      <button class="btn primary" type="button" (click)="openNew()">+ {{ i18n.t(cfg.newLabel) }}</button>
+    } @else {
+      <span class="badge muted">{{ i18n.t('common.readOnly') }}</span>
+    }
+  </div>
+</header>
+
+@if (message() && !doc()) {
+  <div class="alert error">{{ message() }}</div>
+}
+
+<div class="card table-wrap">
+  <table class="table">
+    <thead>
+      <tr>
+        @for (c of cfg.listCols; track c.key) {
+          <th [class.num]="c.kind === 'amount'">{{ i18n.t(c.label) }}</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      @for (r of rows(); track r.id) {
+        <tr class="clickable" (click)="open(r.id)">
+          @for (c of cfg.listCols; track c.key) {
+            @switch (c.kind) {
+              @case ('amount') { <td class="num">{{ r[c.key] | number: '1.2-4' }}</td> }
+              @case ('status') {
+                <td><span class="badge" [class.ok]="r['status'] === 'Confirmed'" [class.muted]="r['status'] === 'Cancelled'">{{ i18n.t('status.' + r['status']) }}</span></td>
+              }
+              @case ('receiptState') {
+                <td><span class="badge" [class.ok]="r[c.key] === 'Full'">{{ cell(r, c) }}</span></td>
+              }
+              @case ('invoiceState') {
+                <td><span class="badge" [class.ok]="r[c.key] === 'Full'">{{ cell(r, c) }}</span></td>
+              }
+              @default { <td>{{ cell(r, c) }}</td> }
+            }
+          }
+        </tr>
+      } @empty {
+        <tr><td class="empty" [attr.colspan]="cfg.listCols.length">{{ i18n.t(loading() ? 'common.loading' : 'common.empty') }}</td></tr>
+      }
+    </tbody>
+  </table>
+</div>
+
+<footer class="pager">
+  <span>{{ i18n.t('common.total') }}: {{ total() }}</span>
+  <span class="spacer"></span>
+  <button class="btn sm" type="button" [disabled]="page() <= 1" (click)="go(-1)">{{ i18n.t('common.prev') }}</button>
+  <span>{{ page() }} / {{ pages() }}</span>
+  <button class="btn sm" type="button" [disabled]="page() >= pages()" (click)="go(1)">{{ i18n.t('common.next') }}</button>
+</footer>
+
+@if (doc(); as d) {
+  <div class="modal-backdrop" (click)="close()">
+    <form class="modal wide-modal card" (click)="$event.stopPropagation()" (ngSubmit)="save()" novalidate>
+      <h2>
+        {{ i18n.t(cfg.title) }} {{ d['number'] ?? '' }}
+        <span class="badge" [class.ok]="d['status'] === 'Confirmed'" [class.muted]="d['status'] === 'Cancelled'">{{ i18n.t('status.' + d['status']) }}</span>
+      </h2>
+
+      @if (message()) {
+        <div class="alert error">{{ message() }}</div>
+      }
+
+      <div class="form-grid">
+        @for (f of cfg.fields; track f.key) {
+          <div class="field">
+            <label [for]="'d-' + f.key">{{ i18n.t(f.label) }} @if (f.required) {<span class="req">*</span>}</label>
+            @switch (f.type) {
+              @case ('select') {
+                <select class="input" [id]="'d-' + f.key" [name]="f.key" [(ngModel)]="d[f.key]" (ngModelChange)="changed(f.key)" [disabled]="fieldDisabled(f, d)">
+                  @if (f.nullable) {
+                    <option [ngValue]="null">{{ i18n.t('common.none') }}</option>
+                  } @else {
+                    <option [ngValue]="null" disabled>{{ i18n.t('common.select') }}</option>
+                  }
+                  @for (o of optionsFor(f, d[f.key]); track o.value) {
+                    <option [ngValue]="o.value">{{ o.label }}</option>
+                  }
+                </select>
+              }
+              @default {
+                <input class="input" [id]="'d-' + f.key" [name]="f.key" [type]="f.type" [step]="f.step ?? null" [(ngModel)]="d[f.key]"
+                       (ngModelChange)="changed(f.key)" [attr.maxlength]="f.maxlength" [disabled]="fieldDisabled(f, d)" />
+              }
+            }
+          </div>
+        }
+      </div>
+
+      @if (cfg.lineCols) {
+        <h3 class="sub">{{ i18n.t('inv.lines') }}</h3>
+        <div class="table-wrap lines">
+          <table class="table">
+            <thead>
+              <tr>
+                @for (c of visibleLineCols(); track c.key) {
+                  <th [class.num]="c.kind !== 'item'">{{ i18n.t(c.label) }}</th>
+                }
+                <th class="num">{{ i18n.t('pur.lineTotal') }}</th>
+                @if (editable()) { <th></th> }
+              </tr>
+            </thead>
+            <tbody>
+              @for (l of d.lines; track $index; let i = $index) {
+                <tr>
+                  @for (c of visibleLineCols(); track c.key) {
+                    @switch (c.kind) {
+                      @case ('item') {
+                        <td>
+                          <select class="input" [name]="'item' + i" [(ngModel)]="l['itemId']" [disabled]="!editable() || !!l['purchaseOrderLineId']">
+                            <option [ngValue]="0" disabled>{{ i18n.t('common.select') }}</option>
+                            @for (it of itemChoices(l['itemId']); track it.id) {
+                              <option [ngValue]="it.id">{{ lookups.itemLabel(it.id) }}</option>
+                            }
+                          </select>
+                        </td>
+                      }
+                      @case ('readonly') { <td class="num">{{ l[c.key] | number: '1.0-4' }}</td> }
+                      @default {
+                        <td class="num">
+                          <input class="input qty" type="number" [step]="c.kind === 'price' ? '0.0001' : '0.0001'" min="0" [name]="c.key + i" [(ngModel)]="l[c.key]" [disabled]="!editable()" />
+                        </td>
+                      }
+                    }
+                  }
+                  <td class="num">{{ (l['quantity'] || 0) * (l['unitPrice'] || 0) | number: '1.2-4' }}</td>
+                  @if (editable()) {
+                    <td class="actions"><button class="btn sm danger" type="button" (click)="removeLine(i)" [attr.aria-label]="i18n.t('common.remove')">✕</button></td>
+                  }
+                </tr>
+              } @empty {
+                <tr><td class="empty" [attr.colspan]="visibleLineCols().length + 2">{{ i18n.t('inv.noLines') }}</td></tr>
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <th [attr.colspan]="visibleLineCols().length" class="num">{{ i18n.t('pur.total') }} ({{ lookups.currencyLabel(d['currencyId']) }})</th>
+                <th class="num">{{ docTotal() | number: '1.2-4' }}</th>
+                @if (editable()) { <th></th> }
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        @if (editable() && !d['purchaseOrderId']) {
+          <button class="btn sm" type="button" (click)="addLine()">+ {{ i18n.t('inv.addLine') }}</button>
+        }
+      }
+
+      <div class="modal-actions">
+        <button class="btn" type="button" (click)="close()">{{ i18n.t('common.close') }}</button>
+        @if (cfg.kind === 'order' && d['status'] === 'Confirmed') {
+          @if (canCreateReceipt) {
+            <button class="btn" type="button" (click)="createFromOrder('goods-receipts')">{{ i18n.t('pur.createReceipt') }}</button>
+          }
+          @if (canCreateInvoice) {
+            <button class="btn" type="button" (click)="createFromOrder('purchase-invoices')">{{ i18n.t('pur.createInvoice') }}</button>
+          }
+        }
+        @if (canWrite && d['status'] === 'Draft') {
+          <button class="btn" type="button" [disabled]="busy()" (click)="cancelDoc()">{{ i18n.t('inv.cancelDoc') }}</button>
+          <button class="btn" type="submit" [disabled]="busy()">{{ i18n.t('common.save') }}</button>
+          <button class="btn primary" type="button" [disabled]="busy()" (click)="confirm()">{{ i18n.t('inv.confirm') }}</button>
+        }
+        @if (canWrite && d['status'] === 'Confirmed') {
+          <button class="btn danger" type="button" [disabled]="busy()" (click)="cancelDoc()">{{ i18n.t('pur.cancelConfirmed') }}</button>
+        }
+      </div>
+    </form>
+  </div>
+}

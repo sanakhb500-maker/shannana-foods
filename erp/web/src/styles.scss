@@ -188,3 +188,5 @@ tr.clickable { cursor: pointer; }
 .wide-modal { width: min(860px, 100%); }
 .sub { font-size: 1rem; margin: 1rem 0 .4rem; }
 .lines { margin-bottom: .6rem; .input { padding: .3rem .5rem; } .qty { width: 130px; text-align: end; } td { white-space: normal; } }
+
+.table tfoot th { background: var(--surface-2); border-top: 1px solid var(--border); }

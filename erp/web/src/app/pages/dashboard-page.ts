@@ -24,5 +24,5 @@ import { I18n } from '../core/i18n';
 export class DashboardPage {
   readonly auth = inject(Auth);
   readonly i18n = inject(I18n);
-  readonly phases = ['dash.phase3', 'dash.phase4', 'dash.phase5'];
+  readonly phases = ['dash.phase4', 'dash.phase5'];
 }

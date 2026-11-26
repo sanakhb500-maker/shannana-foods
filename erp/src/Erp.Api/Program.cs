@@ -6,10 +6,12 @@ using Erp.Application.Common;
 using Erp.Application.Validators;
 using Erp.Domain.Common;
 using Erp.Application.Inventory;
+using Erp.Application.Purchasing;
 using Erp.Infrastructure.Auth;
 using Erp.Infrastructure.Inventory;
 using Erp.Infrastructure.Identity;
 using Erp.Infrastructure.Persistence;
+using Erp.Infrastructure.Purchasing;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
@@ -30,7 +32,9 @@ var connectionString = cfg.GetConnectionString("Default")
 // ---------- services ----------
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<StockPoster>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
+builder.Services.AddScoped<IPurchasingService, PurchasingService>();
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(connectionString));
 
 builder.Services.AddIdentityCore<AppUser>(o =>

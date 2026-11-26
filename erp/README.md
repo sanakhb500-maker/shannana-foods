@@ -10,7 +10,7 @@ Standalone from the public website (`backend/` + `frontend/`): own database, own
 |---|---|---|
 | 1 | Foundation + master data (auth, roles, items, units, warehouses, suppliers, customers, drivers, vehicles, currencies, rates, users) | done |
 | 2 | Inventory and warehouses (stock balances, movement ledger, transfers, count/opening/write-off adjustments, low-stock, valuation) | done |
-| 3 | Purchasing | planned |
+| 3 | Purchasing (orders, goods receipts, supplier invoices, payments, supplier statement and balances) | done |
 | 4 | Sales and distribution | planned |
 | 5 | Accounting | planned |
 
@@ -60,6 +60,15 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 - **Cancelling a confirmed document** posts reversal movements. It is refused if the stock has since been used (e.g. already transferred on).
 - Items and warehouses that still hold stock cannot be deactivated.
 - Document numbers are id-based (`TRF-000123`, `ADJ-000045`), unique but not guaranteed gap-free.
+
+## Purchasing rules (phase 3)
+- **Flow:** purchase order (Draft -> Confirmed) -> goods receipt (confirm = stock in) -> supplier invoice (confirm = payable) -> payment (on account). Receipts and invoices can also stand alone (direct receipt, no order).
+- **Currency:** each document stores the exchange rate it was saved with (local currency = 1; otherwise the rate you enter, else the latest stored rate on/before the date, else the save is refused). Stock is valued in local currency: unit price x rate.
+- **Order progress:** confirmed receipts raise `receivedQuantity`, confirmed invoices raise `invoicedQuantity`. A receipt cannot exceed the remaining ordered quantity, and an invoice cannot exceed the received-but-not-yet-invoiced quantity.
+- **Cancelling:** an order with confirmed receipts/invoices cannot be cancelled; a receipt cannot be cancelled while invoices cover its quantities or after its stock was used; cancelling a confirmed receipt reverses the stock movements.
+- **Supplier account** (statement / balances, local currency): confirmed invoices raise what you owe, confirmed payments lower it. Payments are on account (not matched to invoices).
+- **Not in this phase** (accounting phase will handle them): price variances between receipt and invoice, exchange-rate differences, purchase returns, tax.
+- **Access:** purchasing data carries cost prices, so reading needs Admin, Accountant, Purchasing or StoreKeeper (Sales and Dispatcher get 403). Writing: orders and invoices - Admin/Purchasing; goods receipts - Admin/Purchasing/StoreKeeper; payments - Admin/Accountant.
 
 ## Auth and roles
 JWT in an HttpOnly cookie (`erp_auth`) plus a double-submit CSRF token (`erp_csrf` cookie echoed in `X-CSRF-Token`) on writes.

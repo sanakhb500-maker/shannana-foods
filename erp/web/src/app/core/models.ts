@@ -42,6 +42,10 @@ export const WRITE_ROLES = {
   customers: ['Admin', 'Sales', 'Accountant'],
   fleet: ['Admin', 'Dispatcher'],
   inventory: ['Admin', 'StoreKeeper'],
+  purchasing: ['Admin', 'Purchasing'],
+  goodsReceipts: ['Admin', 'Purchasing', 'StoreKeeper'],
+  supplierPayments: ['Admin', 'Accountant'],
+  viewPurchasing: ['Admin', 'Accountant', 'Purchasing', 'StoreKeeper'],
 } as const satisfies Record<string, readonly string[]>;
 
 // ---------- inventory ----------
@@ -74,3 +78,12 @@ export interface Transfer { id?: number; number?: string | null; date: string; f
 export interface AdjustmentRow { id: number; number: string | null; date: string; warehouseId: number; reason: AdjustmentReason; status: DocStatus; notes: string | null; lineCount: number }
 export interface AdjustmentLine { itemId: number; countedQuantity: number | null; unitCost: number | null; systemQuantity?: number | null; difference?: number | null }
 export interface Adjustment { id?: number; number?: string | null; date: string; warehouseId: number | null; reason: AdjustmentReason; status: DocStatus; notes: string | null; lines: AdjustmentLine[] }
+
+// ---------- purchasing ----------
+export interface LookupSupplier { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean; currencyId?: number | null }
+export interface LookupCurrency { id: number; code: string; nameAr: string; nameEn: string; symbol: string; isLocal: boolean; isActive: boolean }
+export type ProgressState = 'None' | 'Partial' | 'Full';
+
+export interface SupplierBalanceRow { supplierId: number; code: string; nameAr: string; nameEn: string; invoiced: number; paid: number; balance: number }
+export interface StatementRow { date: string; type: 'Invoice' | 'Payment'; number: string | null; reference: string | null; currencyId: number; amount: number; exchangeRate: number; debit: number; credit: number; balance: number }
+export interface SupplierStatement { supplierId: number; from: string | null; to: string | null; openingBalance: number; rows: StatementRow[]; totalInvoiced: number; totalPaid: number; closingBalance: number }

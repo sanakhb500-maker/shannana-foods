@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../core/auth';
 import { I18n } from '../core/i18n';
+import { WRITE_ROLES } from '../core/models';
 
 interface NavItem {
   path: string;
@@ -27,6 +28,13 @@ interface NavItem {
           <div class="nav-group">{{ i18n.t('nav.inventory') }}</div>
           @for (n of inventory; track n.path) {
             <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
+          }
+
+          @if (canViewPurchasing) {
+            <div class="nav-group">{{ i18n.t('nav.purchasing') }}</div>
+            @for (n of purchasing; track n.path) {
+              <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
+            }
           }
 
           @if (auth.hasAnyRole(['Admin'])) {
@@ -76,6 +84,17 @@ export class Shell {
     { path: '/low-stock', label: 'nav.lowStock' },
     { path: '/transfers', label: 'nav.transfers' },
     { path: '/adjustments', label: 'nav.adjustments' },
+  ];
+
+  readonly canViewPurchasing = this.auth.hasAnyRole(WRITE_ROLES.viewPurchasing);
+
+  readonly purchasing: NavItem[] = [
+    { path: '/purchase-orders', label: 'nav.purchaseOrders' },
+    { path: '/goods-receipts', label: 'nav.goodsReceipts' },
+    { path: '/purchase-invoices', label: 'nav.purchaseInvoices' },
+    { path: '/supplier-payments', label: 'nav.supplierPayments' },
+    { path: '/supplier-statement', label: 'nav.supplierStatement' },
+    { path: '/supplier-balances', label: 'nav.supplierBalances' },
   ];
 
   toggleTheme(): void {

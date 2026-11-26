@@ -33,6 +33,15 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
     public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
     public DbSet<StockAdjustmentLine> StockAdjustmentLines => Set<StockAdjustmentLine>();
 
+    // purchasing
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+    public DbSet<PurchaseOrderLine> PurchaseOrderLines => Set<PurchaseOrderLine>();
+    public DbSet<GoodsReceipt> GoodsReceipts => Set<GoodsReceipt>();
+    public DbSet<GoodsReceiptLine> GoodsReceiptLines => Set<GoodsReceiptLine>();
+    public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
+    public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
+    public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -139,6 +148,91 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
         });
 
         ConfigureInventory(b);
+        ConfigurePurchasing(b);
+    }
+
+    private static void ConfigurePurchasing(ModelBuilder b)
+    {
+        b.Entity<PurchaseOrder>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.SupplierId, x.Date });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Supplier>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.PurchaseOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_PurchaseOrder_Rate", "[ExchangeRate] > 0"));
+        });
+
+        b.Entity<PurchaseOrderLine>(e =>
+        {
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_PurchaseOrderLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0");
+                t.HasCheckConstraint("CK_PurchaseOrderLine_Progress", "[ReceivedQuantity] >= 0 AND [InvoicedQuantity] >= 0");
+            });
+        });
+
+        b.Entity<GoodsReceipt>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Supplier>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PurchaseOrder>().WithMany().HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.GoodsReceiptId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_GoodsReceipt_Rate", "[ExchangeRate] > 0"));
+        });
+
+        b.Entity<GoodsReceiptLine>(e =>
+        {
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PurchaseOrderLine>().WithMany().HasForeignKey(x => x.PurchaseOrderLineId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_GoodsReceiptLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0"));
+        });
+
+        b.Entity<PurchaseInvoice>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.SupplierId, x.Date });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.SupplierInvoiceNumber).HasMaxLength(50);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Supplier>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PurchaseOrder>().WithMany().HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.PurchaseInvoiceId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_PurchaseInvoice_Rate", "[ExchangeRate] > 0"));
+        });
+
+        b.Entity<PurchaseInvoiceLine>(e =>
+        {
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PurchaseOrderLine>().WithMany().HasForeignKey(x => x.PurchaseOrderLineId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_PurchaseInvoiceLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0"));
+        });
+
+        b.Entity<SupplierPayment>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.SupplierId, x.Date });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Reference).HasMaxLength(100);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.Property(x => x.Method).HasConversion<int>();
+            e.HasOne<Supplier>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_SupplierPayment_Amount", "[Amount] > 0 AND [ExchangeRate] > 0"));
+        });
     }
 
     private static void ConfigureInventory(ModelBuilder b)

@@ -4,98 +4,11 @@ using Erp.Domain.Entities;
 using Erp.Domain.Inventory;
 using Erp.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 namespace Erp.Infrastructure.Inventory;
 
-public class InventoryService(AppDbContext db, ICurrentUser user, IConfiguration cfg) : IInventoryService
+public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster poster) : IInventoryService
 {
-    /// <summary>Where a posting comes from; stamped onto every movement it creates.</summary>
-    private readonly record struct Source(DateOnly Date, string DocumentType, int DocumentId, string? DocumentNumber);
-
-    private bool AllowNegativeStock => cfg.GetValue<bool>("Inventory:AllowNegativeStock");
-    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
-
-    // =====================================================================
-    //  Core posting: every stock change goes through Receive / Issue.
-    //  Movement + balance changes are only staged here; the caller commits
-    //  them with ONE SaveChanges together with the document status.
-    // =====================================================================
-
-    private async Task<StockBalance> BalanceAsync(int itemId, int warehouseId, CancellationToken ct)
-    {
-        var tracked = db.StockBalances.Local.FirstOrDefault(b => b.ItemId == itemId && b.WarehouseId == warehouseId);
-        if (tracked is not null) return tracked;
-
-        var balance = await db.StockBalances.FirstOrDefaultAsync(b => b.ItemId == itemId && b.WarehouseId == warehouseId, ct);
-        if (balance is null)
-        {
-            balance = new StockBalance { ItemId = itemId, WarehouseId = warehouseId };
-            db.StockBalances.Add(balance);
-        }
-        return balance;
-    }
-
-    private void AddMovement(Source s, int itemId, int warehouseId, decimal signedQty, decimal unitCost, MovementType type, int? reversalOf) =>
-        db.StockMovements.Add(new StockMovement
-        {
-            Date = s.Date, ItemId = itemId, WarehouseId = warehouseId, Quantity = signedQty, UnitCost = unitCost, Type = type,
-            DocumentType = s.DocumentType, DocumentId = s.DocumentId, DocumentNumber = s.DocumentNumber,
-            ReversalOfId = reversalOf, CreatedAt = DateTime.UtcNow, CreatedBy = user.UserName,
-        });
-
-    private async Task ReceiveAsync(Source s, int itemId, int warehouseId, decimal qty, decimal unitCost, MovementType type, int? reversalOf, CancellationToken ct)
-    {
-        var b = await BalanceAsync(itemId, warehouseId, ct);
-        b.AverageCost = Costing.MovingAverage(b.Quantity, b.AverageCost, qty, unitCost);
-        b.Quantity += qty;
-        b.LastMovementAt = DateTime.UtcNow;
-        AddMovement(s, itemId, warehouseId, qty, unitCost, type, reversalOf);
-    }
-
-    /// <summary>Takes stock out at the current average cost and returns that cost.</summary>
-    private async Task<decimal> IssueAsync(Source s, int itemId, int warehouseId, decimal qty, MovementType type, int? reversalOf, CancellationToken ct)
-    {
-        var b = await BalanceAsync(itemId, warehouseId, ct);
-        if (!AllowNegativeStock && b.Quantity < qty)
-        {
-            var item = await db.Items.Where(i => i.Id == itemId).Select(i => i.Code).FirstOrDefaultAsync(ct);
-            var wh = await db.Warehouses.Where(w => w.Id == warehouseId).Select(w => w.Code).FirstOrDefaultAsync(ct);
-            throw new BusinessRuleException(
-                $"Insufficient stock for item {item} in warehouse {wh}: available {b.Quantity:0.####}, required {qty:0.####}.");
-        }
-        var cost = b.AverageCost;
-        b.Quantity -= qty;
-        b.LastMovementAt = DateTime.UtcNow;
-        AddMovement(s, itemId, warehouseId, -qty, cost, type, reversalOf);
-        return cost;
-    }
-
-    /// <summary>Undo every movement of a confirmed document: stock that came in goes back out, stock that went out comes back at its original cost.</summary>
-    private async Task ReverseDocumentAsync(string documentType, int documentId, string? number, CancellationToken ct)
-    {
-        var source = new Source(Today, documentType, documentId, number);
-        var originals = await db.StockMovements
-            .Where(m => m.DocumentType == documentType && m.DocumentId == documentId && m.ReversalOfId == null)
-            .OrderByDescending(m => m.Id).ToListAsync(ct);
-
-        foreach (var m in originals)
-        {
-            if (m.Quantity > 0)
-            {
-                try { await IssueAsync(source, m.ItemId, m.WarehouseId, m.Quantity, MovementType.Reversal, m.Id, ct); }
-                catch (BusinessRuleException ex)
-                {
-                    throw new BusinessRuleException("This document cannot be cancelled because its stock has already been used. " + ex.Message);
-                }
-            }
-            else
-            {
-                await ReceiveAsync(source, m.ItemId, m.WarehouseId, -m.Quantity, m.UnitCost, MovementType.Reversal, m.Id, ct);
-            }
-        }
-    }
-
     private async Task<int> SaveAsync(CancellationToken ct)
     {
         try { return await db.SaveChangesAsync(ct); }
@@ -174,11 +87,11 @@ public class InventoryService(AppDbContext db, ICurrentUser user, IConfiguration
         EnsureDraft(t.Status);
         await EnsureActiveAsync([t.FromWarehouseId, t.ToWarehouseId], t.Lines.Select(l => l.ItemId), ct);
 
-        var src = new Source(t.Date, DocumentTypes.Transfer, t.Id, t.Number);
+        var src = new PostingSource(t.Date, DocumentTypes.Transfer, t.Id, t.Number);
         foreach (var line in t.Lines)
         {
-            var cost = await IssueAsync(src, line.ItemId, t.FromWarehouseId, line.Quantity, MovementType.TransferOut, null, ct);
-            await ReceiveAsync(src, line.ItemId, t.ToWarehouseId, line.Quantity, cost, MovementType.TransferIn, null, ct);
+            var cost = await poster.IssueAsync(src, line.ItemId, t.FromWarehouseId, line.Quantity, MovementType.TransferOut, null, ct);
+            await poster.ReceiveAsync(src, line.ItemId, t.ToWarehouseId, line.Quantity, cost, MovementType.TransferIn, null, ct);
         }
         t.Status = DocumentStatus.Confirmed;
         t.ConfirmedAt = DateTime.UtcNow;
@@ -191,7 +104,7 @@ public class InventoryService(AppDbContext db, ICurrentUser user, IConfiguration
     {
         var t = await LoadTransferAsync(id, ct);
         if (t.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
-        if (t.Status == DocumentStatus.Confirmed) await ReverseDocumentAsync(DocumentTypes.Transfer, t.Id, t.Number, ct);
+        if (t.Status == DocumentStatus.Confirmed) await poster.ReverseDocumentAsync(DocumentTypes.Transfer, t.Id, t.Number, ct);
         t.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
         return t;
@@ -258,10 +171,10 @@ public class InventoryService(AppDbContext db, ICurrentUser user, IConfiguration
         EnsureDraft(a.Status);
         await EnsureActiveAsync([a.WarehouseId], a.Lines.Select(l => l.ItemId), ct);
 
-        var src = new Source(a.Date, DocumentTypes.Adjustment, a.Id, a.Number);
+        var src = new PostingSource(a.Date, DocumentTypes.Adjustment, a.Id, a.Number);
         foreach (var line in a.Lines)
         {
-            var balance = await BalanceAsync(line.ItemId, a.WarehouseId, ct);
+            var balance = await poster.BalanceAsync(line.ItemId, a.WarehouseId, ct);
             var diff = line.CountedQuantity - balance.Quantity;
             line.SystemQuantity = balance.Quantity;
             line.Difference = diff;
@@ -272,11 +185,11 @@ public class InventoryService(AppDbContext db, ICurrentUser user, IConfiguration
                 var cost = line.UnitCost
                            ?? (balance.AverageCost > 0 ? balance.AverageCost
                                : await db.Items.Where(i => i.Id == line.ItemId).Select(i => i.CostPrice).FirstAsync(ct));
-                await ReceiveAsync(src, line.ItemId, a.WarehouseId, diff, cost, MovementType.AdjustmentIn, null, ct);
+                await poster.ReceiveAsync(src, line.ItemId, a.WarehouseId, diff, cost, MovementType.AdjustmentIn, null, ct);
             }
             else if (diff < 0)
             {
-                await IssueAsync(src, line.ItemId, a.WarehouseId, -diff, MovementType.AdjustmentOut, null, ct);
+                await poster.IssueAsync(src, line.ItemId, a.WarehouseId, -diff, MovementType.AdjustmentOut, null, ct);
             }
         }
         a.Status = DocumentStatus.Confirmed;
@@ -290,7 +203,7 @@ public class InventoryService(AppDbContext db, ICurrentUser user, IConfiguration
     {
         var a = await LoadAdjustmentAsync(id, ct);
         if (a.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
-        if (a.Status == DocumentStatus.Confirmed) await ReverseDocumentAsync(DocumentTypes.Adjustment, a.Id, a.Number, ct);
+        if (a.Status == DocumentStatus.Confirmed) await poster.ReverseDocumentAsync(DocumentTypes.Adjustment, a.Id, a.Number, ct);
         a.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
         return a;

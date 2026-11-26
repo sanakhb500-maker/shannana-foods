@@ -24,6 +24,10 @@ public static class Policies
     public const string ManageCustomers = "Manage.Customers";
     public const string ManageFleet = "Manage.Fleet";
     public const string ManageInventory = "Manage.Inventory";
+    public const string ViewPurchasing = "View.Purchasing";
+    public const string ManagePurchasing = "Manage.Purchasing";
+    public const string ReceiveGoods = "Manage.GoodsReceipts";
+    public const string ManageSupplierPayments = "Manage.SupplierPayments";
 
     public static readonly IReadOnlyDictionary<string, string[]> Map = new Dictionary<string, string[]>
     {
@@ -35,5 +39,10 @@ public static class Policies
         [ManageCustomers] = [Roles.Admin, Roles.Sales, Roles.Accountant],
         [ManageFleet] = [Roles.Admin, Roles.Dispatcher],
         [ManageInventory] = [Roles.Admin, Roles.StoreKeeper],
+        // Purchasing data carries cost prices, so it is NOT readable by every signed-in user.
+        [ViewPurchasing] = [Roles.Admin, Roles.Accountant, Roles.Purchasing, Roles.StoreKeeper],
+        [ManagePurchasing] = [Roles.Admin, Roles.Purchasing],
+        [ReceiveGoods] = [Roles.Admin, Roles.Purchasing, Roles.StoreKeeper],
+        [ManageSupplierPayments] = [Roles.Admin, Roles.Accountant],
     };
 }
