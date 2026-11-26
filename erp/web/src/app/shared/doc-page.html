@@ -1,11 +1,11 @@
 <header class="page-head">
   <h1>{{ i18n.t(cfg.title) }}</h1>
   <div class="page-tools">
-    @if (cfg.filters.includes('supplier')) {
-      <select class="input" [(ngModel)]="supplierFilter" (ngModelChange)="reload()">
-        <option [ngValue]="null">{{ i18n.t('pur.allSuppliers') }}</option>
-        @for (s of lookups.suppliers(); track s.id) {
-          <option [ngValue]="s.id">{{ lookups.supplierLabel(s.id) }}</option>
+    @if (cfg.filters.includes('party')) {
+      <select class="input" [(ngModel)]="partyFilter" (ngModelChange)="reload()">
+        <option [ngValue]="null">{{ i18n.t(cfg.partyKey === 'supplierId' ? 'pur.allSuppliers' : 'sal.allCustomers') }}</option>
+        @for (p of partyOptions; track p.value) {
+          <option [ngValue]="p.value">{{ p.label }}</option>
         }
       </select>
     }
@@ -16,7 +16,7 @@
       }
     </select>
     @if (cfg.filters.includes('pending')) {
-      <label class="check"><input type="checkbox" [(ngModel)]="pendingOnly" (change)="reload()" /> {{ i18n.t('pur.awaitingReceipt') }}</label>
+      <label class="check"><input type="checkbox" [(ngModel)]="pendingOnly" (change)="reload()" /> {{ i18n.t(cfg.pendingLabel ?? 'pur.awaitingReceipt') }}</label>
     }
     @if (canWrite) {
       <button class="btn primary" type="button" (click)="openNew()">+ {{ i18n.t(cfg.newLabel) }}</button>
@@ -48,10 +48,7 @@
               @case ('status') {
                 <td><span class="badge" [class.ok]="r['status'] === 'Confirmed'" [class.muted]="r['status'] === 'Cancelled'">{{ i18n.t('status.' + r['status']) }}</span></td>
               }
-              @case ('receiptState') {
-                <td><span class="badge" [class.ok]="r[c.key] === 'Full'">{{ cell(r, c) }}</span></td>
-              }
-              @case ('invoiceState') {
+              @case ('progress') {
                 <td><span class="badge" [class.ok]="r[c.key] === 'Full'">{{ cell(r, c) }}</span></td>
               }
               @default { <td>{{ cell(r, c) }}</td> }
@@ -131,7 +128,7 @@
                     @switch (c.kind) {
                       @case ('item') {
                         <td>
-                          <select class="input" [name]="'item' + i" [(ngModel)]="l['itemId']" [disabled]="!editable() || !!l['purchaseOrderLineId']">
+                          <select class="input" [name]="'item' + i" [(ngModel)]="l['itemId']" (ngModelChange)="itemChanged(l)" [disabled]="!editable() || !!(cfg.order && l[cfg.order.lineKey])">
                             <option [ngValue]="0" disabled>{{ i18n.t('common.select') }}</option>
                             @for (it of itemChoices(l['itemId']); track it.id) {
                               <option [ngValue]="it.id">{{ lookups.itemLabel(it.id) }}</option>
@@ -165,19 +162,16 @@
             </tfoot>
           </table>
         </div>
-        @if (editable() && !d['purchaseOrderId']) {
+        @if (editable() && !(cfg.order && d[cfg.order.idKey])) {
           <button class="btn sm" type="button" (click)="addLine()">+ {{ i18n.t('inv.addLine') }}</button>
         }
       }
 
       <div class="modal-actions">
         <button class="btn" type="button" (click)="close()">{{ i18n.t('common.close') }}</button>
-        @if (cfg.kind === 'order' && d['status'] === 'Confirmed') {
-          @if (canCreateReceipt) {
-            <button class="btn" type="button" (click)="createFromOrder('goods-receipts')">{{ i18n.t('pur.createReceipt') }}</button>
-          }
-          @if (canCreateInvoice) {
-            <button class="btn" type="button" (click)="createFromOrder('purchase-invoices')">{{ i18n.t('pur.createInvoice') }}</button>
+        @if (d['status'] === 'Confirmed') {
+          @for (sc of shortcuts; track sc.route) {
+            <button class="btn" type="button" (click)="goShortcut(sc.route)">{{ i18n.t(sc.label) }}</button>
           }
         }
         @if (canWrite && d['status'] === 'Draft') {

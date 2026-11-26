@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Api } from './api';
 import { I18n } from './i18n';
-import { LookupCurrency, LookupItem, LookupSupplier, LookupWarehouse } from './models';
+import { LookupCurrency, LookupCustomer, LookupDriver, LookupItem, LookupSupplier, LookupVehicle, LookupWarehouse } from './models';
 
 /** Cached reference data, used to label ids and fill selects on inventory and purchasing screens. */
 @Injectable({ providedIn: 'root' })
@@ -13,6 +13,9 @@ export class Lookups {
   readonly warehouses = signal<LookupWarehouse[]>([]);
   readonly suppliers = signal<LookupSupplier[]>([]);
   readonly currencies = signal<LookupCurrency[]>([]);
+  readonly customers = signal<LookupCustomer[]>([]);
+  readonly drivers = signal<LookupDriver[]>([]);
+  readonly vehicles = signal<LookupVehicle[]>([]);
   readonly activeItems = computed(() => this.items().filter((i) => i.isActive));
   readonly activeWarehouses = computed(() => this.warehouses().filter((w) => w.isActive));
   readonly activeSuppliers = computed(() => this.suppliers().filter((s) => s.isActive));
@@ -31,6 +34,9 @@ export class Lookups {
     this.api.list<LookupWarehouse>('warehouses', { pageSize: 500 }).subscribe((r) => this.warehouses.set(r.items));
     this.api.list<LookupSupplier>('suppliers', { pageSize: 500 }).subscribe((r) => this.suppliers.set(r.items));
     this.api.list<LookupCurrency>('currencies', { pageSize: 100 }).subscribe((r) => this.currencies.set(r.items));
+    this.api.list<LookupCustomer>('customers', { pageSize: 500 }).subscribe((r) => this.customers.set(r.items));
+    this.api.list<LookupDriver>('drivers', { pageSize: 500 }).subscribe((r) => this.drivers.set(r.items));
+    this.api.list<LookupVehicle>('vehicles', { pageSize: 500 }).subscribe((r) => this.vehicles.set(r.items));
   }
 
   itemLabel(id: number | null | undefined): string {
@@ -46,6 +52,20 @@ export class Lookups {
   supplierLabel(id: number | null | undefined): string {
     const s = this.suppliers().find((x) => x.id === id);
     return s ? `${s.code} — ${this.i18n.name(s)}` : id ? String(id) : '';
+  }
+
+  customerLabel(id: number | null | undefined): string {
+    const c = this.customers().find((x) => x.id === id);
+    return c ? `${c.code} — ${this.i18n.name(c)}` : id ? String(id) : '';
+  }
+
+  driverLabel(id: number | null | undefined): string {
+    return this.drivers().find((x) => x.id === id)?.name ?? (id ? String(id) : '');
+  }
+
+  vehicleLabel(id: number | null | undefined): string {
+    const v = this.vehicles().find((x) => x.id === id);
+    return v ? (v.description ? `${v.plateNumber} — ${v.description}` : v.plateNumber) : id ? String(id) : '';
   }
 
   currencyLabel(id: number | null | undefined): string {

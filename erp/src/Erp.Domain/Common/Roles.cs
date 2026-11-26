@@ -28,6 +28,11 @@ public static class Policies
     public const string ManagePurchasing = "Manage.Purchasing";
     public const string ReceiveGoods = "Manage.GoodsReceipts";
     public const string ManageSupplierPayments = "Manage.SupplierPayments";
+    public const string ViewSales = "View.Sales";
+    public const string ManageSales = "Manage.Sales";
+    public const string ManageDeliveries = "Manage.Deliveries";
+    public const string ManageTrips = "Manage.Trips";
+    public const string ManageCustomerReceipts = "Manage.CustomerReceipts";
 
     public static readonly IReadOnlyDictionary<string, string[]> Map = new Dictionary<string, string[]>
     {
@@ -44,5 +49,11 @@ public static class Policies
         [ManagePurchasing] = [Roles.Admin, Roles.Purchasing],
         [ReceiveGoods] = [Roles.Admin, Roles.Purchasing, Roles.StoreKeeper],
         [ManageSupplierPayments] = [Roles.Admin, Roles.Accountant],
+        [ViewSales] = [Roles.Admin, Roles.Accountant, Roles.Sales, Roles.Dispatcher, Roles.StoreKeeper],
+        [ManageSales] = [Roles.Admin, Roles.Sales],
+        // Deliveries and returns move physical stock, so the store keeper can post them too.
+        [ManageDeliveries] = [Roles.Admin, Roles.Sales, Roles.StoreKeeper],
+        [ManageTrips] = [Roles.Admin, Roles.Dispatcher],
+        [ManageCustomerReceipts] = [Roles.Admin, Roles.Accountant],
     };
 }

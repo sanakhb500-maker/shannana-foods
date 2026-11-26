@@ -7,11 +7,13 @@ using Erp.Application.Validators;
 using Erp.Domain.Common;
 using Erp.Application.Inventory;
 using Erp.Application.Purchasing;
+using Erp.Application.Sales;
 using Erp.Infrastructure.Auth;
 using Erp.Infrastructure.Inventory;
 using Erp.Infrastructure.Identity;
 using Erp.Infrastructure.Persistence;
 using Erp.Infrastructure.Purchasing;
+using Erp.Infrastructure.Sales;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Diagnostics;
@@ -35,6 +37,7 @@ builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<StockPoster>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IPurchasingService, PurchasingService>();
+builder.Services.AddScoped<ISalesService, SalesService>();
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(connectionString));
 
 builder.Services.AddIdentityCore<AppUser>(o =>

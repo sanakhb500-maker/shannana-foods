@@ -190,3 +190,4 @@ tr.clickable { cursor: pointer; }
 .lines { margin-bottom: .6rem; .input { padding: .3rem .5rem; } .qty { width: 130px; text-align: end; } td { white-space: normal; } }
 
 .table tfoot th { background: var(--surface-2); border-top: 1px solid var(--border); }
+.add-stop { display: flex; gap: .5rem; align-items: center; .input { flex: 1; } }

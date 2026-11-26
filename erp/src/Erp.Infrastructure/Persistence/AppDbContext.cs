@@ -42,6 +42,19 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
     public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
     public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
 
+    // sales and distribution
+    public DbSet<SalesOrder> SalesOrders => Set<SalesOrder>();
+    public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
+    public DbSet<DeliveryNote> DeliveryNotes => Set<DeliveryNote>();
+    public DbSet<DeliveryNoteLine> DeliveryNoteLines => Set<DeliveryNoteLine>();
+    public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
+    public DbSet<SalesInvoiceLine> SalesInvoiceLines => Set<SalesInvoiceLine>();
+    public DbSet<SalesReturn> SalesReturns => Set<SalesReturn>();
+    public DbSet<SalesReturnLine> SalesReturnLines => Set<SalesReturnLine>();
+    public DbSet<CustomerReceipt> CustomerReceipts => Set<CustomerReceipt>();
+    public DbSet<DistributionTrip> DistributionTrips => Set<DistributionTrip>();
+    public DbSet<TripStop> TripStops => Set<TripStop>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -149,6 +162,131 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
 
         ConfigureInventory(b);
         ConfigurePurchasing(b);
+        ConfigureSales(b);
+    }
+
+    private static void ConfigureSales(ModelBuilder b)
+    {
+        b.Entity<SalesOrder>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.CustomerId, x.Date });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.SalesOrderId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_SalesOrder_Rate", "[ExchangeRate] > 0"));
+        });
+
+        b.Entity<SalesOrderLine>(e =>
+        {
+            e.Property(x => x.RowVersion).IsRowVersion();
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_SalesOrderLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0");
+                t.HasCheckConstraint("CK_SalesOrderLine_Progress", "[DeliveredQuantity] >= 0 AND [InvoicedQuantity] >= 0");
+            });
+        });
+
+        b.Entity<DeliveryNote>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<SalesOrder>().WithMany().HasForeignKey(x => x.SalesOrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.DeliveryNoteId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_DeliveryNote_Rate", "[ExchangeRate] > 0"));
+        });
+
+        b.Entity<DeliveryNoteLine>(e =>
+        {
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<SalesOrderLine>().WithMany().HasForeignKey(x => x.SalesOrderLineId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_DeliveryNoteLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0"));
+        });
+
+        b.Entity<SalesInvoice>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.CustomerId, x.Date });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<SalesOrder>().WithMany().HasForeignKey(x => x.SalesOrderId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.SalesInvoiceId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_SalesInvoice_Rate", "[ExchangeRate] > 0"));
+        });
+
+        b.Entity<SalesInvoiceLine>(e =>
+        {
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<SalesOrderLine>().WithMany().HasForeignKey(x => x.SalesOrderLineId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_SalesInvoiceLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0"));
+        });
+
+        b.Entity<SalesReturn>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.CustomerId, x.Date });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.SalesReturnId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_SalesReturn_Rate", "[ExchangeRate] > 0"));
+        });
+
+        b.Entity<SalesReturnLine>(e =>
+        {
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_SalesReturnLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0"));
+        });
+
+        b.Entity<CustomerReceipt>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.CustomerId, x.Date });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Reference).HasMaxLength(100);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.Property(x => x.Method).HasConversion<int>();
+            e.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_CustomerReceipt_Amount", "[Amount] > 0 AND [ExchangeRate] > 0"));
+        });
+
+        b.Entity<DistributionTrip>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.Date, x.DriverId });
+            e.HasIndex(x => new { x.Date, x.VehicleId });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Driver>().WithMany().HasForeignKey(x => x.DriverId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Vehicle>().WithMany().HasForeignKey(x => x.VehicleId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Stops).WithOne().HasForeignKey(s => s.TripId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<TripStop>(e =>
+        {
+            e.HasIndex(x => x.DeliveryNoteId);
+            e.Property(x => x.Notes).HasMaxLength(300);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<DeliveryNote>().WithMany().HasForeignKey(x => x.DeliveryNoteId).OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     private static void ConfigurePurchasing(ModelBuilder b)

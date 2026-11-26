@@ -46,13 +46,18 @@ export const WRITE_ROLES = {
   goodsReceipts: ['Admin', 'Purchasing', 'StoreKeeper'],
   supplierPayments: ['Admin', 'Accountant'],
   viewPurchasing: ['Admin', 'Accountant', 'Purchasing', 'StoreKeeper'],
+  sales: ['Admin', 'Sales'],
+  deliveries: ['Admin', 'Sales', 'StoreKeeper'],
+  trips: ['Admin', 'Dispatcher'],
+  customerReceipts: ['Admin', 'Accountant'],
+  viewSales: ['Admin', 'Accountant', 'Sales', 'Dispatcher', 'StoreKeeper'],
 } as const satisfies Record<string, readonly string[]>;
 
 // ---------- inventory ----------
 export type DocStatus = 'Draft' | 'Confirmed' | 'Cancelled';
 export type AdjustmentReason = 'Count' | 'Opening' | 'Damage' | 'Other';
 
-export interface LookupItem { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean; reorderLevel?: number }
+export interface LookupItem { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean; reorderLevel?: number; salePrice?: number }
 export interface LookupWarehouse { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean }
 
 export interface BalanceRow {
@@ -87,3 +92,18 @@ export type ProgressState = 'None' | 'Partial' | 'Full';
 export interface SupplierBalanceRow { supplierId: number; code: string; nameAr: string; nameEn: string; invoiced: number; paid: number; balance: number }
 export interface StatementRow { date: string; type: 'Invoice' | 'Payment'; number: string | null; reference: string | null; currencyId: number; amount: number; exchangeRate: number; debit: number; credit: number; balance: number }
 export interface SupplierStatement { supplierId: number; from: string | null; to: string | null; openingBalance: number; rows: StatementRow[]; totalInvoiced: number; totalPaid: number; closingBalance: number }
+
+// ---------- sales and distribution ----------
+export interface LookupCustomer { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean; currencyId?: number | null; creditLimit?: number }
+export interface LookupDriver { id: number; name: string; isActive: boolean }
+export interface LookupVehicle { id: number; plateNumber: string; description?: string | null; isActive: boolean }
+
+export type TripStatus = 'Planned' | 'InTransit' | 'Completed' | 'Cancelled';
+export type StopStatus = 'Pending' | 'Delivered' | 'Failed';
+
+export interface TripRow { id: number; number: string | null; date: string; driverId: number; vehicleId: number; status: TripStatus; stopCount: number; deliveredCount: number }
+export interface TripStop { id?: number; sequence: number; status: StopStatus; notes: string | null; deliveryNoteId: number; deliveryNumber: string | null; customerId: number; totalAmount: number; currencyId: number; deliveryStatus: DocStatus }
+export interface Trip { id?: number; number?: string | null; date: string; driverId: number | null; vehicleId: number | null; status: TripStatus; notes: string | null; startedAt?: string | null; completedAt?: string | null; stops: TripStop[] }
+export interface DeliveryRow { id: number; number: string | null; customerId: number; totalAmount: number; currencyId: number; status: DocStatus; tripNumber: string | null }
+
+export interface CustomerBalanceRow { customerId: number; code: string; nameAr: string; nameEn: string; invoiced: number; returned: number; received: number; balance: number; creditLimit: number }

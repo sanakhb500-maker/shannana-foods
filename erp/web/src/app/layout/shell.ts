@@ -37,6 +37,13 @@ interface NavItem {
             }
           }
 
+          @if (canViewSales) {
+            <div class="nav-group">{{ i18n.t('nav.sales') }}</div>
+            @for (n of sales; track n.path) {
+              <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
+            }
+          }
+
           @if (auth.hasAnyRole(['Admin'])) {
             <div class="nav-group">{{ i18n.t('nav.admin') }}</div>
             <a routerLink="/users" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t('nav.users') }}</a>
@@ -95,6 +102,19 @@ export class Shell {
     { path: '/supplier-payments', label: 'nav.supplierPayments' },
     { path: '/supplier-statement', label: 'nav.supplierStatement' },
     { path: '/supplier-balances', label: 'nav.supplierBalances' },
+  ];
+
+  readonly canViewSales = this.auth.hasAnyRole(WRITE_ROLES.viewSales);
+
+  readonly sales: NavItem[] = [
+    { path: '/sales-orders', label: 'nav.salesOrders' },
+    { path: '/deliveries', label: 'nav.deliveries' },
+    { path: '/trips', label: 'nav.trips' },
+    { path: '/sales-invoices', label: 'nav.salesInvoices' },
+    { path: '/sales-returns', label: 'nav.salesReturns' },
+    { path: '/customer-receipts', label: 'nav.customerReceipts' },
+    { path: '/customer-statement', label: 'nav.customerStatement' },
+    { path: '/customer-balances', label: 'nav.customerBalances' },
   ];
 
   toggleTheme(): void {

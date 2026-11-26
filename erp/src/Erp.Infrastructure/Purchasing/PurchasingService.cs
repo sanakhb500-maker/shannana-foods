@@ -1,9 +1,12 @@
 using Erp.Application.Common;
 using Erp.Application.Purchasing;
 using Erp.Domain.Entities;
+using Erp.Infrastructure.Common;
 using Erp.Infrastructure.Inventory;
 using Erp.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+
+using static Erp.Infrastructure.Common.DocumentRules;
 
 namespace Erp.Infrastructure.Purchasing;
 
@@ -13,9 +16,6 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     //  Shared helpers
     // =====================================================================
 
-    private static decimal R4(decimal v) => Math.Round(v, 4, MidpointRounding.AwayFromZero);
-    private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
-    private static (int Page, int Size) Paging(int page, int size) => (Math.Max(1, page), Math.Clamp(size, 1, 200));
     private static string Like(string? q) => q!.Trim();
 
     private async Task SaveAsync(CancellationToken ct)
@@ -24,43 +24,10 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         catch (DbUpdateConcurrencyException) { throw new ConcurrencyConflictException(); }
     }
 
-    private static void EnsureDraft(DocumentStatus s)
-    {
-        if (s != DocumentStatus.Draft) throw new BusinessRuleException("Only draft documents can be edited or confirmed.");
-    }
-
     private async Task EnsureSupplierAsync(int supplierId, CancellationToken ct)
     {
         if (!await db.Suppliers.AnyAsync(s => s.Id == supplierId && s.IsActive, ct))
             throw new BusinessRuleException("The supplier does not exist or is inactive.");
-    }
-
-    private async Task EnsureItemsAsync(IEnumerable<int> itemIds, CancellationToken ct)
-    {
-        var ids = itemIds.Distinct().ToList();
-        if (await db.Items.CountAsync(i => ids.Contains(i.Id) && i.IsActive, ct) != ids.Count)
-            throw new BusinessRuleException("An item does not exist or is inactive.");
-    }
-
-    private async Task EnsureWarehouseAsync(int warehouseId, CancellationToken ct)
-    {
-        if (!await db.Warehouses.AnyAsync(w => w.Id == warehouseId && w.IsActive, ct))
-            throw new BusinessRuleException("The warehouse does not exist or is inactive.");
-    }
-
-    /// <summary>1 for the local currency; otherwise the provided rate, the fallback, or the latest stored rate on/before the date.</summary>
-    private async Task<decimal> ResolveRateAsync(int currencyId, DateOnly date, decimal? provided, decimal? fallback, CancellationToken ct)
-    {
-        var cur = await db.Currencies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == currencyId && c.IsActive, ct)
-                  ?? throw new BusinessRuleException("The currency does not exist or is inactive.");
-        if (cur.IsLocal) return 1m;
-        if (provided is > 0) return provided.Value;
-        if (fallback is > 0) return fallback.Value;
-
-        var stored = await db.ExchangeRates.AsNoTracking()
-            .Where(r => r.CurrencyId == currencyId && r.IsActive && r.Date <= date)
-            .OrderByDescending(r => r.Date).Select(r => (decimal?)r.Rate).FirstOrDefaultAsync(ct);
-        return stored ?? throw new BusinessRuleException($"No exchange rate for {cur.Code} on or before {date:yyyy-MM-dd}. Enter one.");
     }
 
     /// <summary>
@@ -138,8 +105,8 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     public async Task<PurchaseOrder> CreateOrderAsync(PurchaseOrderInput i, CancellationToken ct)
     {
         await EnsureSupplierAsync(i.SupplierId, ct);
-        await EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
-        var rate = await ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, null, ct);
+        await db.EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, null, ct);
 
         var po = new PurchaseOrder
         {
@@ -159,8 +126,8 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         var po = await LoadOrderAsync(id, ct);
         EnsureDraft(po.Status);
         await EnsureSupplierAsync(i.SupplierId, ct);
-        await EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
-        var rate = await ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, po.CurrencyId == i.CurrencyId ? po.ExchangeRate : null, ct);
+        await db.EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, po.CurrencyId == i.CurrencyId ? po.ExchangeRate : null, ct);
 
         po.Date = i.Date; po.ExpectedDate = i.ExpectedDate; po.SupplierId = i.SupplierId; po.CurrencyId = i.CurrencyId;
         po.ExchangeRate = rate; po.Notes = Clean(i.Notes);
@@ -176,7 +143,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         var po = await LoadOrderAsync(id, ct);
         EnsureDraft(po.Status);
         await EnsureSupplierAsync(po.SupplierId, ct);
-        await EnsureItemsAsync(po.Lines.Select(l => l.ItemId), ct);
+        await db.EnsureItemsAsync(po.Lines.Select(l => l.ItemId), ct);
         po.Status = DocumentStatus.Confirmed;
         po.ConfirmedAt = DateTime.UtcNow;
         po.ConfirmedBy = user.UserName;
@@ -228,8 +195,8 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     private async Task ValidateReceiptAsync(GoodsReceiptInput i, CancellationToken ct)
     {
         await EnsureSupplierAsync(i.SupplierId, ct);
-        await EnsureWarehouseAsync(i.WarehouseId, ct);
-        await EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
+        await db.EnsureWarehouseAsync(i.WarehouseId, ct);
+        await db.EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
         await ValidateOrderLinkAsync(i.PurchaseOrderId, i.SupplierId, i.CurrencyId, i.Lines.Select(l => (l.PurchaseOrderLineId, l.ItemId)).ToList(), ct);
     }
 
@@ -237,7 +204,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     {
         await ValidateReceiptAsync(i, ct);
         var order = i.PurchaseOrderId is { } oid ? await db.PurchaseOrders.AsNoTracking().FirstAsync(p => p.Id == oid, ct) : null;
-        var rate = await ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, order?.ExchangeRate, ct);
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, order?.ExchangeRate, ct);
 
         var r = new GoodsReceipt
         {
@@ -258,7 +225,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         EnsureDraft(r.Status);
         await ValidateReceiptAsync(i, ct);
         var order = i.PurchaseOrderId is { } oid ? await db.PurchaseOrders.AsNoTracking().FirstAsync(p => p.Id == oid, ct) : null;
-        var rate = await ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate,
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate,
             order?.ExchangeRate ?? (r.CurrencyId == i.CurrencyId ? r.ExchangeRate : null), ct);
 
         r.Date = i.Date; r.SupplierId = i.SupplierId; r.WarehouseId = i.WarehouseId; r.PurchaseOrderId = i.PurchaseOrderId;
@@ -275,8 +242,8 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         var r = await LoadReceiptAsync(id, ct);
         EnsureDraft(r.Status);
         await EnsureSupplierAsync(r.SupplierId, ct);
-        await EnsureWarehouseAsync(r.WarehouseId, ct);
-        await EnsureItemsAsync(r.Lines.Select(l => l.ItemId), ct);
+        await db.EnsureWarehouseAsync(r.WarehouseId, ct);
+        await db.EnsureItemsAsync(r.Lines.Select(l => l.ItemId), ct);
 
         PurchaseOrder? po = null;
         if (r.PurchaseOrderId is { } oid)
@@ -373,7 +340,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     private async Task ValidateInvoiceAsync(PurchaseInvoiceInput i, CancellationToken ct)
     {
         await EnsureSupplierAsync(i.SupplierId, ct);
-        await EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
+        await db.EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
         await ValidateOrderLinkAsync(i.PurchaseOrderId, i.SupplierId, i.CurrencyId, i.Lines.Select(l => (l.PurchaseOrderLineId, l.ItemId)).ToList(), ct);
     }
 
@@ -381,7 +348,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     {
         await ValidateInvoiceAsync(i, ct);
         var order = i.PurchaseOrderId is { } oid ? await db.PurchaseOrders.AsNoTracking().FirstAsync(p => p.Id == oid, ct) : null;
-        var rate = await ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, order?.ExchangeRate, ct);
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, order?.ExchangeRate, ct);
 
         var inv = new PurchaseInvoice
         {
@@ -402,7 +369,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         EnsureDraft(inv.Status);
         await ValidateInvoiceAsync(i, ct);
         var order = i.PurchaseOrderId is { } oid ? await db.PurchaseOrders.AsNoTracking().FirstAsync(p => p.Id == oid, ct) : null;
-        var rate = await ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate,
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate,
             order?.ExchangeRate ?? (inv.CurrencyId == i.CurrencyId ? inv.ExchangeRate : null), ct);
 
         inv.Date = i.Date; inv.DueDate = i.DueDate; inv.SupplierId = i.SupplierId; inv.SupplierInvoiceNumber = Clean(i.SupplierInvoiceNumber);
@@ -419,7 +386,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         var inv = await LoadInvoiceAsync(id, ct);
         EnsureDraft(inv.Status);
         await EnsureSupplierAsync(inv.SupplierId, ct);
-        await EnsureItemsAsync(inv.Lines.Select(l => l.ItemId), ct);
+        await db.EnsureItemsAsync(inv.Lines.Select(l => l.ItemId), ct);
 
         if (inv.PurchaseOrderId is { } oid)
         {
@@ -492,7 +459,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     public async Task<SupplierPayment> CreatePaymentAsync(SupplierPaymentInput i, CancellationToken ct)
     {
         await EnsureSupplierAsync(i.SupplierId, ct);
-        var rate = await ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, null, ct);
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, null, ct);
         var p = new SupplierPayment
         {
             Date = i.Date, SupplierId = i.SupplierId, CurrencyId = i.CurrencyId, ExchangeRate = rate, Amount = R4(i.Amount),
@@ -510,7 +477,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         var p = await LoadPaymentAsync(id, ct);
         EnsureDraft(p.Status);
         await EnsureSupplierAsync(i.SupplierId, ct);
-        var rate = await ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, p.CurrencyId == i.CurrencyId ? p.ExchangeRate : null, ct);
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, p.CurrencyId == i.CurrencyId ? p.ExchangeRate : null, ct);
         p.Date = i.Date; p.SupplierId = i.SupplierId; p.CurrencyId = i.CurrencyId; p.ExchangeRate = rate; p.Amount = R4(i.Amount);
         p.Method = i.Method; p.Reference = Clean(i.Reference); p.Notes = Clean(i.Notes);
         await SaveAsync(ct);

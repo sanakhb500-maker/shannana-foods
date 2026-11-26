@@ -11,7 +11,7 @@ Standalone from the public website (`backend/` + `frontend/`): own database, own
 | 1 | Foundation + master data (auth, roles, items, units, warehouses, suppliers, customers, drivers, vehicles, currencies, rates, users) | done |
 | 2 | Inventory and warehouses (stock balances, movement ledger, transfers, count/opening/write-off adjustments, low-stock, valuation) | done |
 | 3 | Purchasing (orders, goods receipts, supplier invoices, payments, supplier statement and balances) | done |
-| 4 | Sales and distribution | planned |
+| 4 | Sales and distribution (sales orders, delivery notes, distribution trips, sales invoices, returns, customer receipts, customer statement and balances) | done |
 | 5 | Accounting | planned |
 
 ## Layout
@@ -69,6 +69,17 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 - **Supplier account** (statement / balances, local currency): confirmed invoices raise what you owe, confirmed payments lower it. Payments are on account (not matched to invoices).
 - **Not in this phase** (accounting phase will handle them): price variances between receipt and invoice, exchange-rate differences, purchase returns, tax.
 - **Access:** purchasing data carries cost prices, so reading needs Admin, Accountant, Purchasing or StoreKeeper (Sales and Dispatcher get 403). Writing: orders and invoices - Admin/Purchasing; goods receipts - Admin/Purchasing/StoreKeeper; payments - Admin/Accountant.
+
+## Sales and distribution rules (phase 4)
+- **Flow:** sales order (Draft -> Confirmed) -> delivery note (confirm = stock out) -> sales invoice (confirm = receivable). Deliveries and invoices can also stand alone. Same money rules as purchasing (rate snapshot per document, local-currency stock valuation).
+- **Order progress:** a delivery cannot exceed the remaining ordered quantity; an invoice cannot exceed the delivered-but-not-yet-invoiced quantity. Orders with confirmed deliveries/invoices cannot be cancelled; a delivery cannot be cancelled while invoices cover it or after its trip has left.
+- **Cost of goods sold:** a confirmed delivery records the warehouse's average cost on each line (`unitCost`) for the accounting phase.
+- **Credit limit:** confirming an invoice is refused if it would push the customer's balance (confirmed invoices - returns - receipts, local currency) above their credit limit. 0 = no limit.
+- **Returns:** a confirmed return puts goods back in stock at the warehouse's current average cost (so the average is not distorted) and credits the customer. They are standalone (not matched to an invoice).
+- **Customer account** (statement / balances): invoices raise what the customer owes; returns and receipts lower it. Receipts are on account.
+- **Trips:** a trip = driver + vehicle + ordered stops (delivery notes). Planned (editable) -> In transit (needs every delivery confirmed; record Delivered/Failed per stop) -> Completed (no Pending stops). One driver / one vehicle per day. A delivery can be on one live trip at a time; a **delivered** stop is final, a **failed** one can be planned again. A failed stop does not move stock back by itself: cancel the delivery note if the goods return.
+- **Access:** reading sales data needs Admin, Accountant, Sales, Dispatcher or StoreKeeper (Purchasing gets 403). Writing: orders and invoices - Admin/Sales; deliveries and returns - Admin/Sales/StoreKeeper; trips - Admin/Dispatcher; customer receipts - Admin/Accountant.
+- **Not in this phase:** tax, price lists/discounts, returns matched to invoices, vehicle capacity checks (items have no weight yet).
 
 ## Auth and roles
 JWT in an HttpOnly cookie (`erp_auth`) plus a double-submit CSRF token (`erp_csrf` cookie echoed in `X-CSRF-Token`) on writes.

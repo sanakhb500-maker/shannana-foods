@@ -7,7 +7,7 @@ import { Api, parseApiError } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
-import { Paged, WRITE_ROLES } from '../core/models';
+import { Paged } from '../core/models';
 import { DOC_CONFIGS, DocConfig, DocField, ListCol } from './doc-config';
 
 type Doc = Record<string, any> & { lines?: Record<string, any>[] };
@@ -17,8 +17,8 @@ type Option = { value: unknown; label: string };
 const today = () => new Date().toISOString().slice(0, 10);
 
 /**
- * One list + editor screen for any purchasing document (order, receipt, invoice, payment),
- * driven by a {@link DocConfig}. Draft -> Save / Confirm / Cancel; confirmed documents are read-only.
+ * One list + editor screen for any purchasing or sales document, driven by a {@link DocConfig}.
+ * Draft -> Save / Confirm / Cancel; confirmed documents are read-only (cancelling reverses their effect).
  */
 @Component({
   selector: 'app-doc-page',
@@ -35,8 +35,6 @@ export class DocPage implements OnInit {
 
   readonly cfg: DocConfig = DOC_CONFIGS[this.route.snapshot.data['kind'] as keyof typeof DOC_CONFIGS];
   readonly canWrite = this.auth.hasAnyRole(this.cfg.writeRoles);
-  readonly canCreateReceipt = this.auth.hasAnyRole(WRITE_ROLES.goodsReceipts);
-  readonly canCreateInvoice = this.auth.hasAnyRole(WRITE_ROLES.purchasing);
   readonly statuses = ['Draft', 'Confirmed', 'Cancelled'];
 
   readonly rows = signal<Row[]>([]);
@@ -49,13 +47,16 @@ export class DocPage implements OnInit {
   readonly busy = signal(false);
   readonly orderOptions = signal<Row[]>([]);
   status = '';
-  supplierFilter: number | null = null;
+  partyFilter: number | null = null;
   pendingOnly = false;
 
   readonly editable = computed(() => this.canWrite && (this.doc()?.['status'] ?? 'Draft') === 'Draft');
   readonly visibleLineCols = computed(() =>
     (this.cfg.lineCols ?? []).filter((c) => !c.afterDraft || (this.doc()?.['status'] ?? 'Draft') !== 'Draft'),
   );
+  /** Shortcuts the current user may use (e.g. "create delivery" on a confirmed order). */
+  readonly shortcuts = (this.cfg.shortcuts ?? []).filter((s) => this.auth.hasAnyRole(s.roles));
+
   /** A method, not a computed: line values are edited in place, which signals cannot see. */
   docTotal(): number {
     return (this.doc()?.lines ?? []).reduce((s, l) => s + Number(l['quantity'] ?? 0) * Number(l['unitPrice'] ?? 0), 0);
@@ -64,8 +65,8 @@ export class DocPage implements OnInit {
   ngOnInit(): void {
     this.lookups.ensureLoaded();
     this.load();
-    const fromPo = Number(this.route.snapshot.queryParamMap.get('fromPo'));
-    if (fromPo && this.cfg.hasOrderLink && this.canWrite) this.newFromOrder(fromPo);
+    const fromOrder = Number(this.route.snapshot.queryParamMap.get('fromOrder'));
+    if (fromOrder && this.cfg.order && this.canWrite) this.newFromOrder(fromOrder);
   }
 
   // ---------- list ----------
@@ -83,7 +84,7 @@ export class DocPage implements OnInit {
     this.loading.set(true);
     const qs = [`page=${this.page()}`, 'pageSize=20'];
     if (this.status) qs.push(`status=${this.status}`);
-    if (this.supplierFilter) qs.push(`supplierId=${this.supplierFilter}`);
+    if (this.partyFilter) qs.push(`${this.cfg.partyKey}=${this.partyFilter}`);
     if (this.pendingOnly) qs.push('pendingOnly=true');
     this.api.get<Paged<Row>>(`${this.cfg.endpoint}?${qs.join('&')}`).subscribe({
       next: (r) => {
@@ -103,19 +104,26 @@ export class DocPage implements OnInit {
     switch (c.kind) {
       case 'date': return v ?? '';
       case 'supplier': return this.lookups.supplierLabel(v);
+      case 'customer': return this.lookups.customerLabel(v);
       case 'warehouse': return this.lookups.warehouseLabel(v);
       case 'currency': return this.lookups.currencyLabel(v);
-      case 'receiptState':
-      case 'invoiceState': return this.i18n.t('prog.' + v);
+      case 'progress': return this.i18n.t('prog.' + v);
       case 'method': return this.i18n.t('pm.' + v);
       default: return v === null || v === undefined ? '' : String(v);
     }
+  }
+
+  get partyOptions(): Option[] {
+    return this.cfg.partyKey === 'supplierId'
+      ? this.lookups.suppliers().map((s) => ({ value: s.id, label: this.lookups.supplierLabel(s.id) }))
+      : this.lookups.customers().map((c) => ({ value: c.id, label: this.lookups.customerLabel(c.id) }));
   }
 
   // ---------- header field helpers ----------
   optionsFor(f: DocField, selected: unknown): Option[] {
     switch (f.options) {
       case 'suppliers': return this.lookups.suppliers().filter((s) => s.isActive || s.id === selected).map((s) => ({ value: s.id, label: this.lookups.supplierLabel(s.id) }));
+      case 'customers': return this.lookups.customers().filter((c) => c.isActive || c.id === selected).map((c) => ({ value: c.id, label: this.lookups.customerLabel(c.id) }));
       case 'warehouses': return this.lookups.warehouses().filter((w) => w.isActive || w.id === selected).map((w) => ({ value: w.id, label: this.lookups.warehouseLabel(w.id) }));
       case 'currencies': return this.lookups.currencies().filter((c) => c.isActive || c.id === selected).map((c) => ({ value: c.id, label: `${c.code} — ${this.i18n.name(c)}` }));
       case 'orders': return this.orderOptions().map((o) => ({ value: o['id'], label: `${o['number']} · ${o['date']}` }));
@@ -127,32 +135,46 @@ export class DocPage implements OnInit {
   fieldDisabled(f: DocField, d: Doc): boolean {
     if (!this.editable()) return true;
     if (f.disabledWhen === 'localCurrency') return this.lookups.isLocalCurrency(d['currencyId']);
-    if (f.disabledWhen === 'orderLinked') return !!d['purchaseOrderId'];
+    if (f.disabledWhen === 'orderLinked') return !!this.orderId(d);
     return false;
+  }
+
+  private orderId(d: Doc): number | null {
+    return this.cfg.order ? (d[this.cfg.order.idKey] ?? null) : null;
   }
 
   itemChoices(selected: number) {
     return this.lookups.items().filter((i) => i.isActive || i.id === selected);
   }
 
+  /** Selling documents: suggest the item's sale price (converted to the document currency) when the price is still empty. */
+  itemChanged(line: Record<string, any>): void {
+    if (!this.cfg.priceFromItem || line['unitPrice'] !== null && line['unitPrice'] !== undefined && line['unitPrice'] !== '') return;
+    const item = this.lookups.items().find((i) => i.id === line['itemId']);
+    const d = this.doc();
+    if (!item?.salePrice || !d) return;
+    const rate = Number(d['exchangeRate']) > 0 ? Number(d['exchangeRate']) : 1;
+    line['unitPrice'] = Math.round((item.salePrice / rate) * 10000) / 10000;
+  }
+
   /** Reacts to header edits: keeps the exchange rate and order options in step. */
   changed(key: string): void {
     const d = this.doc();
     if (!d) return;
-    if (this.cfg.hasRate && (key === 'currencyId' || key === 'date')) this.refreshRate(d);
-    if (key === 'supplierId') {
-      if (this.cfg.hasOrderLink) {
-        d['purchaseOrderId'] = null;
-        this.loadOrderOptions(d['supplierId']);
+    if (key === 'currencyId' || key === 'date') this.refreshRate(d);
+    if (key === this.cfg.partyKey) {
+      if (this.cfg.order) {
+        d[this.cfg.order.idKey] = null;
+        this.loadOrderOptions(d[this.cfg.partyKey]);
       }
-      const sup = this.lookups.suppliers().find((s) => s.id === d['supplierId']);
-      if (sup?.currencyId && !d['id'] && !d['purchaseOrderId']) {
-        d['currencyId'] = sup.currencyId;
+      const party = (this.cfg.partyKey === 'supplierId' ? this.lookups.suppliers() : this.lookups.customers()).find((p) => p.id === d[this.cfg.partyKey]);
+      if (party?.currencyId && !d['id'] && !this.orderId(d)) {
+        d['currencyId'] = party.currencyId;
         this.refreshRate(d);
       }
     }
-    if (key === 'purchaseOrderId') {
-      if (d['purchaseOrderId']) this.applyOrder(d['purchaseOrderId']);
+    if (this.cfg.order && key === this.cfg.order.idKey) {
+      if (d[key]) this.applyOrder(d[key]);
       else this.unlinkOrder(d);
     }
   }
@@ -171,56 +193,51 @@ export class DocPage implements OnInit {
     });
   }
 
-  private loadOrderOptions(supplierId: number | null): void {
-    if (!supplierId) {
+  private loadOrderOptions(partyId: number | null): void {
+    const link = this.cfg.order;
+    if (!link || !partyId) {
       this.orderOptions.set([]);
       return;
     }
-    this.api.get<Paged<Row>>(`purchaseorders?status=Confirmed&supplierId=${supplierId}&pageSize=200`).subscribe((r) => this.orderOptions.set(r.items));
+    this.api.get<Paged<Row>>(`${link.endpoint}?status=Confirmed&${this.cfg.partyKey}=${partyId}&pageSize=200`).subscribe((r) => this.orderOptions.set(r.items));
   }
 
-  /** Fills supplier, currency, rate and the not-yet-received (or not-yet-invoiced) lines from a purchase order. */
+  /** Fills party, currency, rate and the lines still open (not yet received / delivered / invoiced) from the order. */
   private applyOrder(orderId: number): void {
-    this.api.get<Doc & { id: number; supplierId: number; currencyId: number; exchangeRate: number; lines: Row[] }>(`purchaseorders/${orderId}`).subscribe({
-      next: (po) => {
+    const link = this.cfg.order!;
+    this.api.get<Doc & { lines: Row[] }>(`${link.endpoint}/${orderId}`).subscribe({
+      next: (order) => {
         const d = this.doc();
         if (!d) return;
-        d['supplierId'] = po.supplierId;
-        d['currencyId'] = po.currencyId;
-        d['exchangeRate'] = po.exchangeRate;
-        const lines = po.lines
-          .map((l) => {
-            const left = this.cfg.kind === 'receipt' ? l['quantity'] - l['receivedQuantity'] : l['receivedQuantity'] - l['invoicedQuantity'];
-            return { purchaseOrderLineId: l['id'], itemId: l['itemId'], quantity: left, unitPrice: l['unitPrice'] };
-          })
-          .filter((l) => l.quantity > 0);
+        d[this.cfg.partyKey] = order[this.cfg.partyKey];
+        d['currencyId'] = order['currencyId'];
+        d['exchangeRate'] = order['exchangeRate'];
+        const lines = order.lines
+          .map((l) => ({ [link.lineKey]: l['id'], itemId: l['itemId'], quantity: link.remaining(l), unitPrice: l['unitPrice'] }))
+          .filter((l) => (l['quantity'] as number) > 0);
         d.lines = lines;
         this.message.set(lines.length ? '' : this.i18n.t('pur.nothingLeft'));
-        this.loadOrderOptions(po.supplierId);
+        this.loadOrderOptions(order[this.cfg.partyKey]);
       },
       error: (e) => this.message.set(parseApiError(e).message),
     });
   }
 
   private unlinkOrder(d: Doc): void {
-    for (const l of d.lines ?? []) l['purchaseOrderLineId'] = null;
+    for (const l of d.lines ?? []) l[this.cfg.order!.lineKey] = null;
   }
 
   // ---------- editor ----------
   private blankLine(): Record<string, any> {
-    return this.cfg.kind === 'order'
-      ? { itemId: 0, quantity: null, unitPrice: null }
-      : { purchaseOrderLineId: null, itemId: 0, quantity: null, unitPrice: null };
+    return this.cfg.order
+      ? { [this.cfg.order.lineKey]: null, itemId: 0, quantity: null, unitPrice: null }
+      : { itemId: 0, quantity: null, unitPrice: null };
   }
 
   private blank(): Doc {
     const local = this.lookups.currencies().find((c) => c.isLocal)?.id ?? null;
-    const d: Doc = { date: today(), supplierId: null, currencyId: local, exchangeRate: 1, notes: null, status: 'Draft' };
+    const d: Doc = { date: today(), [this.cfg.partyKey]: null, currencyId: local, exchangeRate: 1, notes: null, status: 'Draft', ...this.cfg.blankExtras?.() };
     if (this.cfg.lineCols) d.lines = [this.blankLine()];
-    if (this.cfg.kind === 'order') d['expectedDate'] = null;
-    if (this.cfg.kind === 'receipt') Object.assign(d, { warehouseId: null, purchaseOrderId: null });
-    if (this.cfg.kind === 'invoice') Object.assign(d, { dueDate: null, supplierInvoiceNumber: null, purchaseOrderId: null });
-    if (this.cfg.kind === 'payment') Object.assign(d, { amount: null, method: 'Cash', reference: null });
     return d;
   }
 
@@ -230,11 +247,11 @@ export class DocPage implements OnInit {
     this.doc.set(this.blank());
   }
 
-  /** Starts a receipt/invoice pre-filled from a confirmed purchase order (used by the order screen's shortcuts). */
+  /** Starts a document pre-filled from a confirmed order (used by the order screen's shortcuts). */
   newFromOrder(orderId: number): void {
     this.message.set('');
     const d = this.blank();
-    d['purchaseOrderId'] = orderId;
+    d[this.cfg.order!.idKey] = orderId;
     this.doc.set(d);
     this.applyOrder(orderId);
   }
@@ -244,11 +261,12 @@ export class DocPage implements OnInit {
     this.api.get<Doc>(`${this.cfg.endpoint}/${id}`).subscribe({
       next: (d) => {
         this.doc.set(d);
-        this.loadOrderOptions(d['supplierId']);
+        this.loadOrderOptions(d[this.cfg.partyKey]);
         // an order that is no longer "Confirmed" would be missing from the options: make sure the linked one shows
-        if (d['purchaseOrderId']) {
-          this.api.get<Row>(`purchaseorders/${d['purchaseOrderId']}`).subscribe((po) => {
-            if (!this.orderOptions().some((o) => o['id'] === po['id'])) this.orderOptions.update((o) => [...o, po]);
+        const oid = this.orderId(d);
+        if (oid) {
+          this.api.get<Row>(`${this.cfg.order!.endpoint}/${oid}`).subscribe((o) => {
+            if (!this.orderOptions().some((x) => x['id'] === o['id'])) this.orderOptions.update((list) => [...list, o]);
           });
         }
       },
@@ -258,7 +276,7 @@ export class DocPage implements OnInit {
 
   close(): void {
     this.doc.set(null);
-    if (this.route.snapshot.queryParamMap.has('fromPo')) void this.router.navigate([], { queryParams: {} });
+    if (this.route.snapshot.queryParamMap.has('fromOrder')) void this.router.navigate([], { queryParams: {} });
   }
 
   addLine(): void {
@@ -269,10 +287,10 @@ export class DocPage implements OnInit {
     this.doc()?.lines?.splice(i, 1);
   }
 
-  /** From a confirmed order: jump to a new receipt/invoice pre-filled from it. */
-  createFromOrder(target: 'goods-receipts' | 'purchase-invoices'): void {
+  /** From a confirmed order: jump to a new follow-on document pre-filled from it. */
+  goShortcut(route: string): void {
     const id = this.doc()?.['id'];
-    if (id) void this.router.navigate(['/' + target], { queryParams: { fromPo: id } });
+    if (id) void this.router.navigate([route], { queryParams: { fromOrder: id } });
   }
 
   private num(v: unknown): number | null {
@@ -283,22 +301,16 @@ export class DocPage implements OnInit {
     const d = this.doc()!;
     const b: Record<string, unknown> = {
       date: d['date'],
-      supplierId: d['supplierId'] ?? 0,
+      [this.cfg.partyKey]: d[this.cfg.partyKey] ?? 0,
       currencyId: d['currencyId'] ?? 0,
       exchangeRate: this.num(d['exchangeRate']),
       notes: (d['notes'] as string | null)?.trim() || null,
+      ...this.cfg.bodyExtras?.(d),
     };
-    switch (this.cfg.kind) {
-      case 'order': b['expectedDate'] = d['expectedDate'] || null; break;
-      case 'receipt': Object.assign(b, { warehouseId: d['warehouseId'] ?? 0, purchaseOrderId: d['purchaseOrderId'] ?? null }); break;
-      case 'invoice':
-        Object.assign(b, { dueDate: d['dueDate'] || null, supplierInvoiceNumber: (d['supplierInvoiceNumber'] as string | null)?.trim() || null, purchaseOrderId: d['purchaseOrderId'] ?? null });
-        break;
-      case 'payment': Object.assign(b, { amount: Number(d['amount'] ?? 0), method: d['method'], reference: (d['reference'] as string | null)?.trim() || null }); break;
-    }
     if (this.cfg.lineCols) {
+      const lineKey = this.cfg.order?.lineKey;
       b['lines'] = (d.lines ?? []).map((l) => ({
-        ...(this.cfg.kind === 'order' ? {} : { purchaseOrderLineId: l['purchaseOrderLineId'] ?? null }),
+        ...(lineKey ? { [lineKey]: l[lineKey] ?? null } : {}),
         itemId: l['itemId'],
         quantity: Number(l['quantity'] ?? 0),
         unitPrice: Number(l['unitPrice'] ?? 0),

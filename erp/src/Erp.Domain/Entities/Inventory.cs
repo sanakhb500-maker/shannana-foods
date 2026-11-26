@@ -15,7 +15,8 @@ public enum MovementType
     /// <summary>Undoes a previously confirmed document's movement.</summary>
     Reversal = 9,
     PurchaseReceipt = 10,
-    // Reserved for the next phase: SalesDelivery = 11, ...
+    SalesDelivery = 11,
+    SalesReturn = 12,
 }
 
 /// <summary>Document-type keys stored on movements (kept as text so later phases can add their own).</summary>
@@ -24,6 +25,8 @@ public static class DocumentTypes
     public const string Transfer = "StockTransfer";
     public const string Adjustment = "StockAdjustment";
     public const string GoodsReceipt = "GoodsReceipt";
+    public const string Delivery = "DeliveryNote";
+    public const string SalesReturn = "SalesReturn";
 }
 
 /// <summary>Current quantity and moving-average cost of one item in one warehouse. Maintained together with <see cref="StockMovement"/>.</summary>
