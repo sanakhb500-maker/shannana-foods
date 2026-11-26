@@ -36,6 +36,10 @@ export class Api {
     return this.http.put<ApiEnvelope<T>>(`${BASE}/${endpoint}/${id}`, body).pipe(map((r) => r.data!));
   }
 
+  put<T>(path: string, body: unknown): Observable<T> {
+    return this.http.put<ApiEnvelope<T>>(`${BASE}/${path}`, body).pipe(map((r) => r.data!));
+  }
+
   post<T>(path: string, body: unknown = {}): Observable<T> {
     return this.http.post<ApiEnvelope<T>>(`${BASE}/${path}`, body).pipe(map((r) => r.data!));
   }

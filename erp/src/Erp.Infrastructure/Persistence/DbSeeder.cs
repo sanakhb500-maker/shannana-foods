@@ -11,6 +11,56 @@ namespace Erp.Infrastructure.Persistence;
 
 public static class DbSeeder
 {
+    /// <summary>
+    /// A small starter chart. The accounts carrying a SystemRole are the ones automatic postings use; they can be
+    /// renamed or re-coded freely, but each role must keep exactly one active account.
+    /// </summary>
+    private static async Task SeedChartOfAccountsAsync(AppDbContext db, CancellationToken ct)
+    {
+        if (!await db.Accounts.AnyAsync(ct))
+        {
+            (string Code, string Ar, string En, AccountType Type)[] headers =
+            [
+                ("1000", "الأصول", "Assets", AccountType.Asset),
+                ("2000", "الالتزامات", "Liabilities", AccountType.Liability),
+                ("3000", "حقوق الملكية", "Equity", AccountType.Equity),
+                ("4000", "الإيرادات", "Revenue", AccountType.Revenue),
+                ("5000", "المصروفات", "Expenses", AccountType.Expense),
+            ];
+            var parents = new Dictionary<AccountType, Account>();
+            foreach (var h in headers)
+            {
+                var a = new Account { Code = h.Code, NameAr = h.Ar, NameEn = h.En, Type = h.Type, IsPostable = false };
+                parents[h.Type] = a;
+                db.Accounts.Add(a);
+            }
+            await db.SaveChangesAsync(ct); // parents need ids
+
+            (string Code, string Ar, string En, AccountType Type, string Role)[] leaves =
+            [
+                ("1100", "الصندوق", "Cash", AccountType.Asset, AccountRoles.Cash),
+                ("1200", "البنك", "Bank", AccountType.Asset, AccountRoles.Bank),
+                ("1300", "الذمم المدينة (العملاء)", "Accounts receivable", AccountType.Asset, AccountRoles.Receivables),
+                ("1400", "المخزون", "Inventory", AccountType.Asset, AccountRoles.Inventory),
+                ("2100", "الذمم الدائنة (الموردون)", "Accounts payable", AccountType.Liability, AccountRoles.Payables),
+                ("2200", "بضاعة مستلمة غير مفوترة", "Goods received not invoiced", AccountType.Liability, AccountRoles.GoodsReceivedNotInvoiced),
+                ("3100", "رصيد افتتاحي - حقوق الملكية", "Opening balance equity", AccountType.Equity, AccountRoles.OpeningEquity),
+                ("4100", "إيرادات المبيعات", "Sales revenue", AccountType.Revenue, AccountRoles.SalesRevenue),
+                ("4200", "مردودات ومسموحات المبيعات", "Sales returns and allowances", AccountType.Revenue, AccountRoles.SalesReturns),
+                ("5100", "تكلفة البضاعة المباعة", "Cost of goods sold", AccountType.Expense, AccountRoles.CostOfGoodsSold),
+                ("5200", "فروقات جرد المخزون", "Inventory adjustments", AccountType.Expense, AccountRoles.InventoryAdjustments),
+            ];
+            foreach (var l in leaves)
+                db.Accounts.Add(new Account
+                {
+                    Code = l.Code, NameAr = l.Ar, NameEn = l.En, Type = l.Type, ParentId = parents[l.Type].Id, IsPostable = true, SystemRole = l.Role,
+                });
+        }
+
+        if (!await db.AccountingSettings.AnyAsync(ct)) db.AccountingSettings.Add(new AccountingSetting());
+        await db.SaveChangesAsync(ct);
+    }
+
     public static async Task SeedAsync(IServiceProvider sp, CancellationToken ct = default)
     {
         var db = sp.GetRequiredService<AppDbContext>();
@@ -43,6 +93,8 @@ public static class DbSeeder
             db.Warehouses.Add(new Warehouse { Code = "MAIN", NameAr = "المستودع الرئيسي", NameEn = "Main warehouse" });
 
         await db.SaveChangesAsync(ct);
+
+        await SeedChartOfAccountsAsync(db, ct);
 
         if (!await userMgr.Users.AnyAsync(ct))
         {

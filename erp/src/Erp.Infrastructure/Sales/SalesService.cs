@@ -1,6 +1,7 @@
 using Erp.Application.Common;
 using Erp.Application.Sales;
 using Erp.Domain.Entities;
+using Erp.Infrastructure.Accounting;
 using Erp.Infrastructure.Common;
 using Erp.Infrastructure.Inventory;
 using Erp.Infrastructure.Persistence;
@@ -10,7 +11,7 @@ using static Erp.Infrastructure.Common.DocumentRules;
 
 namespace Erp.Infrastructure.Sales;
 
-public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster) : ISalesService
+public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster, JournalPoster gl) : ISalesService
 {
     // =====================================================================
     //  Shared helpers
@@ -276,6 +277,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         }
 
         var src = new PostingSource(d.Date, DocumentTypes.Delivery, d.Id, d.Number);
+        var costOfGoods = 0m;
         foreach (var line in d.Lines)
         {
             if (line.SalesOrderLineId is { } olid)
@@ -291,7 +293,12 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
             }
             // Stock leaves at the warehouse's current average cost; remember it as the cost of goods sold.
             line.UnitCost = await poster.IssueAsync(src, line.ItemId, d.WarehouseId, line.Quantity, MovementType.SalesDelivery, null, ct);
+            costOfGoods += R4(line.Quantity * line.UnitCost.Value);
         }
+
+        await gl.PostAsync(SourceTypes.DeliveryNote, d.Id, d.Date, $"Delivery {d.Number}", ct,
+            new PostLine(AccountRoles.CostOfGoodsSold, costOfGoods, 0),
+            new PostLine(AccountRoles.Inventory, 0, costOfGoods));
 
         d.Status = DocumentStatus.Confirmed;
         d.ConfirmedAt = DateTime.UtcNow;
@@ -326,6 +333,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
                 }
             }
             await poster.ReverseDocumentAsync(DocumentTypes.Delivery, d.Id, d.Number, ct);
+            await gl.ReverseAsync(SourceTypes.DeliveryNote, d.Id, $"Cancelled delivery {d.Number}", ct);
         }
         d.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
@@ -442,6 +450,11 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
                     $"Credit limit exceeded: limit {customer.CreditLimit:0.##}, current balance {balance:0.##}, this invoice {thisInvoice:0.##} (local currency).");
         }
 
+        var receivable = R4(inv.TotalAmount * inv.ExchangeRate);
+        await gl.PostAsync(SourceTypes.SalesInvoice, inv.Id, inv.Date, $"Sales invoice {inv.Number}", ct,
+            new PostLine(AccountRoles.Receivables, receivable, 0, PartyType.Customer, inv.CustomerId),
+            new PostLine(AccountRoles.SalesRevenue, 0, receivable));
+
         inv.Status = DocumentStatus.Confirmed;
         inv.ConfirmedAt = DateTime.UtcNow;
         inv.ConfirmedBy = user.UserName;
@@ -460,6 +473,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
             foreach (var line in inv.Lines)
                 so.Lines.First(x => x.Id == line.SalesOrderLineId).InvoicedQuantity -= line.Quantity;
         }
+        if (inv.Status == DocumentStatus.Confirmed) await gl.ReverseAsync(SourceTypes.SalesInvoice, inv.Id, $"Cancelled sales invoice {inv.Number}", ct);
         inv.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
         return inv;
@@ -542,6 +556,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         await db.EnsureItemsAsync(r.Lines.Select(l => l.ItemId), ct);
 
         var src = new PostingSource(r.Date, DocumentTypes.SalesReturn, r.Id, r.Number);
+        var costBack = 0m;
         foreach (var line in r.Lines)
         {
             // Goods re-enter stock at the warehouse's current average cost (else the item's standard cost), so the average is not distorted.
@@ -550,7 +565,15 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
                 : await db.Items.Where(x => x.Id == line.ItemId).Select(x => x.CostPrice).FirstAsync(ct);
             line.UnitCost = cost;
             await poster.ReceiveAsync(src, line.ItemId, r.WarehouseId, line.Quantity, cost, MovementType.SalesReturn, null, ct);
+            costBack += R4(line.Quantity * cost);
         }
+
+        var credit = R4(r.TotalAmount * r.ExchangeRate);
+        await gl.PostAsync(SourceTypes.SalesReturn, r.Id, r.Date, $"Sales return {r.Number}", ct,
+            new PostLine(AccountRoles.SalesReturns, credit, 0),
+            new PostLine(AccountRoles.Receivables, 0, credit, PartyType.Customer, r.CustomerId),
+            new PostLine(AccountRoles.Inventory, costBack, 0),
+            new PostLine(AccountRoles.CostOfGoodsSold, 0, costBack));
 
         r.Status = DocumentStatus.Confirmed;
         r.ConfirmedAt = DateTime.UtcNow;
@@ -563,7 +586,11 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var r = await LoadReturnAsync(id, ct);
         if (r.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
-        if (r.Status == DocumentStatus.Confirmed) await poster.ReverseDocumentAsync(DocumentTypes.SalesReturn, r.Id, r.Number, ct);
+        if (r.Status == DocumentStatus.Confirmed)
+        {
+            await poster.ReverseDocumentAsync(DocumentTypes.SalesReturn, r.Id, r.Number, ct);
+            await gl.ReverseAsync(SourceTypes.SalesReturn, r.Id, $"Cancelled sales return {r.Number}", ct);
+        }
         r.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
         return r;
@@ -629,6 +656,10 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         var r = await LoadReceiptAsync(id, ct);
         EnsureDraft(r.Status);
         await EnsureCustomerAsync(r.CustomerId, ct);
+        var received = R4(r.Amount * r.ExchangeRate);
+        await gl.PostAsync(SourceTypes.CustomerReceipt, r.Id, r.Date, $"Customer receipt {r.Number}", ct,
+            new PostLine(r.Method == PaymentMethod.Cash ? AccountRoles.Cash : AccountRoles.Bank, received, 0),
+            new PostLine(AccountRoles.Receivables, 0, received, PartyType.Customer, r.CustomerId));
         r.Status = DocumentStatus.Confirmed;
         r.ConfirmedAt = DateTime.UtcNow;
         r.ConfirmedBy = user.UserName;
@@ -640,6 +671,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var r = await LoadReceiptAsync(id, ct);
         if (r.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
+        if (r.Status == DocumentStatus.Confirmed) await gl.ReverseAsync(SourceTypes.CustomerReceipt, r.Id, $"Cancelled customer receipt {r.Number}", ct);
         r.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
         return r;

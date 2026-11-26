@@ -74,6 +74,23 @@ export const MASTER_CONFIGS: Record<string, CrudConfig> = {
       { key: 'capacityKg', label: 'f.capacityKg', type: 'number', step: '0.01' },
     ],
   },
+  accounts: {
+    title: 'nav.accounts', endpoint: 'accounts', writeRoles: WRITE_ROLES.accounting,
+    defaults: { type: 'Asset', isPostable: true },
+    fields: [
+      { key: 'code', label: 'f.code', type: 'text', required: true, maxlength: 20 },
+      nameAr, nameEn,
+      {
+        key: 'type', label: 'f.type', type: 'select', required: true,
+        options: [
+          { value: 'Asset', label: 'acct.Asset' }, { value: 'Liability', label: 'acct.Liability' }, { value: 'Equity', label: 'acct.Equity' },
+          { value: 'Revenue', label: 'acct.Revenue' }, { value: 'Expense', label: 'acct.Expense' },
+        ],
+      },
+      { key: 'parentId', label: 'acc.parent', type: 'select', lookup: 'accounts', nullable: true },
+      { key: 'isPostable', label: 'acc.postable', type: 'checkbox' },
+    ],
+  },
   currencies: {
     title: 'nav.currencies', endpoint: 'currencies', writeRoles: WRITE_ROLES.currencies,
     defaults: { isLocal: false },

@@ -2,12 +2,14 @@ using Erp.Application.Common;
 using Erp.Application.Inventory;
 using Erp.Domain.Entities;
 using Erp.Domain.Inventory;
+using Erp.Infrastructure.Accounting;
+using Erp.Infrastructure.Common;
 using Erp.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace Erp.Infrastructure.Inventory;
 
-public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster poster) : IInventoryService
+public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster poster, JournalPoster gl) : IInventoryService
 {
     private async Task<int> SaveAsync(CancellationToken ct)
     {
@@ -172,6 +174,8 @@ public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster po
         await EnsureActiveAsync([a.WarehouseId], a.Lines.Select(l => l.ItemId), ct);
 
         var src = new PostingSource(a.Date, DocumentTypes.Adjustment, a.Id, a.Number);
+        var gain = 0m;
+        var loss = 0m;
         foreach (var line in a.Lines)
         {
             var balance = await poster.BalanceAsync(line.ItemId, a.WarehouseId, ct);
@@ -186,12 +190,22 @@ public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster po
                            ?? (balance.AverageCost > 0 ? balance.AverageCost
                                : await db.Items.Where(i => i.Id == line.ItemId).Select(i => i.CostPrice).FirstAsync(ct));
                 await poster.ReceiveAsync(src, line.ItemId, a.WarehouseId, diff, cost, MovementType.AdjustmentIn, null, ct);
+                gain += DocumentRules.R4(diff * cost);
             }
             else if (diff < 0)
             {
-                await poster.IssueAsync(src, line.ItemId, a.WarehouseId, -diff, MovementType.AdjustmentOut, null, ct);
+                var lostCost = await poster.IssueAsync(src, line.ItemId, a.WarehouseId, -diff, MovementType.AdjustmentOut, null, ct);
+                loss += DocumentRules.R4(-diff * lostCost);
             }
         }
+        // Surplus: Dr Inventory / Cr (opening equity for an opening balance, else adjustments). Shortage: the other way round.
+        var counterpart = a.Reason == AdjustmentReason.Opening ? AccountRoles.OpeningEquity : AccountRoles.InventoryAdjustments;
+        await gl.PostAsync(SourceTypes.StockAdjustment, a.Id, a.Date, $"Stock adjustment {a.Number}", ct,
+            new PostLine(AccountRoles.Inventory, gain, 0),
+            new PostLine(counterpart, 0, gain),
+            new PostLine(AccountRoles.InventoryAdjustments, loss, 0),
+            new PostLine(AccountRoles.Inventory, 0, loss));
+
         a.Status = DocumentStatus.Confirmed;
         a.ConfirmedAt = DateTime.UtcNow;
         a.ConfirmedBy = user.UserName;
@@ -203,7 +217,11 @@ public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster po
     {
         var a = await LoadAdjustmentAsync(id, ct);
         if (a.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
-        if (a.Status == DocumentStatus.Confirmed) await poster.ReverseDocumentAsync(DocumentTypes.Adjustment, a.Id, a.Number, ct);
+        if (a.Status == DocumentStatus.Confirmed)
+        {
+            await poster.ReverseDocumentAsync(DocumentTypes.Adjustment, a.Id, a.Number, ct);
+            await gl.ReverseAsync(SourceTypes.StockAdjustment, a.Id, $"Cancelled stock adjustment {a.Number}", ct);
+        }
         a.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
         return a;

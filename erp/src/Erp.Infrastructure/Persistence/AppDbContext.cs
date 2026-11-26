@@ -55,6 +55,12 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
     public DbSet<DistributionTrip> DistributionTrips => Set<DistributionTrip>();
     public DbSet<TripStop> TripStops => Set<TripStop>();
 
+    // accounting
+    public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
+    public DbSet<JournalLine> JournalLines => Set<JournalLine>();
+    public DbSet<AccountingSetting> AccountingSettings => Set<AccountingSetting>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -163,6 +169,53 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
         ConfigureInventory(b);
         ConfigurePurchasing(b);
         ConfigureSales(b);
+        ConfigureAccounting(b);
+    }
+
+    private static void ConfigureAccounting(ModelBuilder b)
+    {
+        b.Entity<Account>(e =>
+        {
+            e.HasIndex(x => x.Code).IsUnique();
+            e.HasIndex(x => x.SystemRole).IsUnique().HasFilter("[SystemRole] IS NOT NULL"); // one account per posting role
+            e.Property(x => x.Code).HasMaxLength(20);
+            e.Property(x => x.NameAr).HasMaxLength(200);
+            e.Property(x => x.NameEn).HasMaxLength(200);
+            e.Property(x => x.SystemRole).HasMaxLength(30);
+            e.Property(x => x.Type).HasConversion<int>();
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.ParentId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<JournalEntry>(e =>
+        {
+            e.Ignore(x => x.Number);
+            e.HasIndex(x => x.Date);
+            e.HasIndex(x => new { x.SourceType, x.SourceId });
+            e.Property(x => x.Description).HasMaxLength(300);
+            e.Property(x => x.SourceType).HasMaxLength(30);
+            e.Property(x => x.PostedBy).HasMaxLength(256);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<JournalEntry>().WithMany().HasForeignKey(x => x.ReversalOfId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.JournalEntryId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<JournalLine>(e =>
+        {
+            e.HasIndex(x => x.AccountId);
+            e.HasIndex(x => new { x.PartyType, x.PartyId });
+            e.Property(x => x.Description).HasMaxLength(200);
+            e.Property(x => x.PartyType).HasConversion<int>();
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+            // exactly one side per line, never negative
+            e.ToTable(t => t.HasCheckConstraint("CK_JournalLine_Side", "[Debit] >= 0 AND [Credit] >= 0 AND (([Debit] > 0 AND [Credit] = 0) OR ([Debit] = 0 AND [Credit] > 0))"));
+        });
+
+        b.Entity<AccountingSetting>(e =>
+        {
+            e.Property(x => x.Id).ValueGeneratedNever();
+            e.Property(x => x.UpdatedBy).HasMaxLength(256);
+            e.ToTable(t => t.HasCheckConstraint("CK_AccountingSetting_Single", "[Id] = 1"));
+        });
     }
 
     private static void ConfigureSales(ModelBuilder b)

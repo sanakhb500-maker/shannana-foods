@@ -1,6 +1,7 @@
 using Erp.Application.Common;
 using Erp.Application.Purchasing;
 using Erp.Domain.Entities;
+using Erp.Infrastructure.Accounting;
 using Erp.Infrastructure.Common;
 using Erp.Infrastructure.Inventory;
 using Erp.Infrastructure.Persistence;
@@ -10,7 +11,7 @@ using static Erp.Infrastructure.Common.DocumentRules;
 
 namespace Erp.Infrastructure.Purchasing;
 
-public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster poster) : IPurchasingService
+public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster poster, JournalPoster gl) : IPurchasingService
 {
     // =====================================================================
     //  Shared helpers
@@ -253,8 +254,10 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         }
 
         var src = new PostingSource(r.Date, DocumentTypes.GoodsReceipt, r.Id, r.Number);
+        var stockValue = 0m;
         foreach (var line in r.Lines)
         {
+            stockValue += R4(line.Quantity * R4(line.UnitPrice * r.ExchangeRate));
             if (line.PurchaseOrderLineId is { } plid)
             {
                 var pl = po?.Lines.FirstOrDefault(x => x.Id == plid) ?? throw new BusinessRuleException("An order line does not belong to the purchase order.");
@@ -270,6 +273,10 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
             await poster.ReceiveAsync(src, line.ItemId, r.WarehouseId, line.Quantity, R4(line.UnitPrice * r.ExchangeRate),
                 MovementType.PurchaseReceipt, null, ct);
         }
+
+        await gl.PostAsync(SourceTypes.GoodsReceipt, r.Id, r.Date, $"Goods receipt {r.Number}", ct,
+            new PostLine(AccountRoles.Inventory, stockValue, 0),
+            new PostLine(AccountRoles.GoodsReceivedNotInvoiced, 0, stockValue));
 
         r.Status = DocumentStatus.Confirmed;
         r.ConfirmedAt = DateTime.UtcNow;
@@ -297,6 +304,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
                 }
             }
             await poster.ReverseDocumentAsync(DocumentTypes.GoodsReceipt, r.Id, r.Number, ct);
+            await gl.ReverseAsync(SourceTypes.GoodsReceipt, r.Id, $"Cancelled goods receipt {r.Number}", ct);
         }
         r.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
@@ -406,6 +414,11 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
             }
         }
 
+        var payable = R4(inv.TotalAmount * inv.ExchangeRate);
+        await gl.PostAsync(SourceTypes.PurchaseInvoice, inv.Id, inv.Date, $"Purchase invoice {inv.Number}", ct,
+            new PostLine(AccountRoles.GoodsReceivedNotInvoiced, payable, 0),
+            new PostLine(AccountRoles.Payables, 0, payable, PartyType.Supplier, inv.SupplierId));
+
         inv.Status = DocumentStatus.Confirmed;
         inv.ConfirmedAt = DateTime.UtcNow;
         inv.ConfirmedBy = user.UserName;
@@ -424,6 +437,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
             foreach (var line in inv.Lines)
                 po.Lines.First(x => x.Id == line.PurchaseOrderLineId).InvoicedQuantity -= line.Quantity;
         }
+        if (inv.Status == DocumentStatus.Confirmed) await gl.ReverseAsync(SourceTypes.PurchaseInvoice, inv.Id, $"Cancelled purchase invoice {inv.Number}", ct);
         inv.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
         return inv;
@@ -489,6 +503,11 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         var p = await LoadPaymentAsync(id, ct);
         EnsureDraft(p.Status);
         await EnsureSupplierAsync(p.SupplierId, ct);
+        var paid = R4(p.Amount * p.ExchangeRate);
+        await gl.PostAsync(SourceTypes.SupplierPayment, p.Id, p.Date, $"Supplier payment {p.Number}", ct,
+            new PostLine(AccountRoles.Payables, paid, 0, PartyType.Supplier, p.SupplierId),
+            new PostLine(p.Method == PaymentMethod.Cash ? AccountRoles.Cash : AccountRoles.Bank, 0, paid));
+
         p.Status = DocumentStatus.Confirmed;
         p.ConfirmedAt = DateTime.UtcNow;
         p.ConfirmedBy = user.UserName;
@@ -500,6 +519,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     {
         var p = await LoadPaymentAsync(id, ct);
         if (p.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
+        if (p.Status == DocumentStatus.Confirmed) await gl.ReverseAsync(SourceTypes.SupplierPayment, p.Id, $"Cancelled supplier payment {p.Number}", ct);
         p.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
         return p;

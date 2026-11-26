@@ -51,6 +51,7 @@ export const WRITE_ROLES = {
   trips: ['Admin', 'Dispatcher'],
   customerReceipts: ['Admin', 'Accountant'],
   viewSales: ['Admin', 'Accountant', 'Sales', 'Dispatcher', 'StoreKeeper'],
+  accounting: ['Admin', 'Accountant'],
 } as const satisfies Record<string, readonly string[]>;
 
 // ---------- inventory ----------
@@ -107,3 +108,27 @@ export interface Trip { id?: number; number?: string | null; date: string; drive
 export interface DeliveryRow { id: number; number: string | null; customerId: number; totalAmount: number; currencyId: number; status: DocStatus; tripNumber: string | null }
 
 export interface CustomerBalanceRow { customerId: number; code: string; nameAr: string; nameEn: string; invoiced: number; returned: number; received: number; balance: number; creditLimit: number }
+
+// ---------- accounting ----------
+export type AccountType = 'Asset' | 'Liability' | 'Equity' | 'Revenue' | 'Expense';
+export type JournalStatus = 'Draft' | 'Posted' | 'Reversed';
+
+export interface AccountDto { id: number; code: string; nameAr: string; nameEn: string; type: AccountType; parentId: number | null; isPostable: boolean; systemRole: string | null; isActive: boolean }
+
+export interface JournalRow { id: number; number: string; date: string; description: string; sourceType: string; sourceId: number | null; status: JournalStatus; total: number }
+export interface JournalLine { id?: number; accountId: number; debit: number | null; credit: number | null; description: string | null; partyType?: string; partyId?: number | null }
+export interface JournalEntry { id?: number; number?: string; date: string; description: string; sourceType?: string; sourceId?: number | null; status: JournalStatus; reversalOfId?: number | null; lines: JournalLine[] }
+
+export interface TrialBalanceRow { accountId: number; code: string; nameAr: string; nameEn: string; type: AccountType; opening: number; debit: number; credit: number; closing: number }
+export interface TrialBalance { rows: TrialBalanceRow[]; totalDebit: number; totalCredit: number; closingDebit: number; closingCredit: number; isBalanced: boolean }
+
+export interface LedgerRow { date: string; entryId: number; entryNumber: string; description: string; sourceType: string; debit: number; credit: number; balance: number }
+export interface Ledger { accountId: number; code: string; nameAr: string; nameEn: string; type: AccountType; opening: number; rows: LedgerRow[]; totalDebit: number; totalCredit: number; closing: number }
+
+export interface StatementLine { accountId: number; code: string; nameAr: string; nameEn: string; amount: number }
+export interface IncomeStatement { revenue: StatementLine[]; totalRevenue: number; expenses: StatementLine[]; totalExpenses: number; netProfit: number }
+export interface BalanceSheet { assets: StatementLine[]; totalAssets: number; liabilities: StatementLine[]; totalLiabilities: number; equity: StatementLine[]; currentEarnings: number; totalEquity: number; isBalanced: boolean }
+
+export interface ReconciliationRow { key: string; generalLedger: number; subLedger: number; difference: number; reconciled: boolean }
+export interface MonthlyFigure { month: string; revenue: number; costOfGoodsSold: number; grossProfit: number }
+export interface AccountingSummary { cashAndBank: number; receivables: number; payables: number; inventoryValue: number; monthRevenue: number; monthCostOfGoodsSold: number; monthGrossProfit: number; months: MonthlyFigure[]; lockDate: string | null }

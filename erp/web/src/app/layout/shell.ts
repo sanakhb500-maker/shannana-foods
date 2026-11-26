@@ -44,6 +44,13 @@ interface NavItem {
             }
           }
 
+          @if (canViewAccounting) {
+            <div class="nav-group">{{ i18n.t('nav.accounting') }}</div>
+            @for (n of accounting; track n.path) {
+              <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
+            }
+          }
+
           @if (auth.hasAnyRole(['Admin'])) {
             <div class="nav-group">{{ i18n.t('nav.admin') }}</div>
             <a routerLink="/users" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t('nav.users') }}</a>
@@ -115,6 +122,19 @@ export class Shell {
     { path: '/customer-receipts', label: 'nav.customerReceipts' },
     { path: '/customer-statement', label: 'nav.customerStatement' },
     { path: '/customer-balances', label: 'nav.customerBalances' },
+  ];
+
+  readonly canViewAccounting = this.auth.hasAnyRole(WRITE_ROLES.accounting);
+
+  readonly accounting: NavItem[] = [
+    { path: '/accounts', label: 'nav.accounts' },
+    { path: '/journal', label: 'nav.journal' },
+    { path: '/ledger', label: 'nav.ledger' },
+    { path: '/trial-balance', label: 'nav.trialBalance' },
+    { path: '/income-statement', label: 'nav.incomeStatement' },
+    { path: '/balance-sheet', label: 'nav.balanceSheet' },
+    { path: '/reconciliation', label: 'nav.reconciliation' },
+    { path: '/accounting-settings', label: 'nav.accountingSettings' },
   ];
 
   toggleTheme(): void {
