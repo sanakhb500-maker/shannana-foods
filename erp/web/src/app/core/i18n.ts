@@ -29,6 +29,12 @@ const DICT: Record<string, { ar: string; en: string }> = {
   'dash.phase5': { ar: 'المحاسبة', en: 'Accounting' },
   'dash.soon': { ar: 'قريباً', en: 'Soon' },
   // login
+  'login.welcome': { ar: 'مرحبًا بعودتك', en: 'Welcome back' },
+  'login.subtitle': { ar: 'سجّل دخولك لمتابعة المخازن والمشتريات والمبيعات والحسابات.', en: 'Sign in to manage stock, purchasing, sales and accounts.' },
+  'login.show': { ar: 'إظهار', en: 'Show' },
+  'login.hide': { ar: 'إخفاء', en: 'Hide' },
+  'login.heroTitle': { ar: 'كل شيء عن شنانة فودز في مكان واحد', en: 'All of Shannana Foods in one place' },
+  'login.heroText': { ar: 'من استلام البضاعة في المستودع إلى توزيعها على العملاء وقيودها المحاسبية — بدقة وسرعة.', en: 'From goods received in the warehouse to delivery to customers and the books — accurate and fast.' },
   'login.title': { ar: 'تسجيل الدخول', en: 'Sign in' },
   'login.email': { ar: 'البريد الإلكتروني', en: 'Email' },
   'login.password': { ar: 'كلمة المرور', en: 'Password' },
