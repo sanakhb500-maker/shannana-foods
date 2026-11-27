@@ -30,7 +30,7 @@ The API must listen on an address the phone can reach (`dotnet run --project src
 ```powershell
 flutter build apk --release --dart-define=API_BASE=https://erp.example.com
 ```
-Output: `build/app/outputs/flutter-apk/`. The manifest allows plain `http` (`usesCleartextTraffic`) so a LAN test server works; for production serve the API over HTTPS and remove that flag. A release build needs your own signing key (see the Flutter docs); the debug APK is for testing only.
+Output: `build/app/outputs/flutter-apk/`. Debug builds may talk to a plain-`http` LAN test server; **release builds are https only**. Sign release builds with your own key: create `android/key.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`; git-ignored) - without it the release APK is signed with the debug key and is only good for trying it. Full production steps (key creation, server address) are in `deploy/README.md` section 7.
 
 ## Test
 ```powershell

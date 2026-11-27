@@ -136,6 +136,9 @@ Roles: Admin, Accountant, StoreKeeper, Purchasing, Sales, Dispatcher. Everyone s
 ## Search selects (large lists)
 Item, supplier, customer and warehouse pickers (document headers and lines, transfers, adjustments, statements, stock filters) are **server-side search selects**: type a code or name and the API returns the best 20 matches, so lists with thousands of records work. Records fetched this way are added to the client cache so their labels display correctly; list pages fetch labels for any id outside the cached first 500. Master-data lists (currencies, units, drivers, vehicles, accounts) are still plain dropdowns because they stay small.
 
+## Deployment (Windows Server)
+See `deploy/README.md`: a release package (`deploy/build-release.ps1`) and install scripts for IIS + SQL Server (ERP) and IIS reverse proxy + Node + PostgreSQL (website), with HTTPS, upgrades and nightly backups.
+
 ## Driver app (mobile)
 Delivery drivers use a mobile app (`erp/mobile`, Flutter) instead of the web ERP.
 - **Accounts:** create a user with the **Driver** role and pick the **driver record** it belongs to (Users screen; one account per driver). A driver-only account is locked to the driver API: every other `/api` call returns 403 and the web login refuses it.

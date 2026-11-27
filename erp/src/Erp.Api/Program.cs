@@ -152,6 +152,7 @@ app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
     await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail(MessageCatalog.Localize(message, LanguageMiddleware.Of(ctx))));
 }));
 
+if (!app.Environment.IsDevelopment()) app.UseHsts(); // browsers remember to use https only
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRouting();

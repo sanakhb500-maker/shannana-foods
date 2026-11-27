@@ -40,3 +40,8 @@ erp/web/.angular/
 erp/**/appsettings.*.local.json
 *.user
 erp/src/Erp.Api/App_Data/
+
+# deployment: built packages and the per-server settings never go to git
+deploy/release/
+deploy/config.psd1
+deploy/server/config.psd1

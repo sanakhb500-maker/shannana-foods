@@ -16,6 +16,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- the development settings hold a throw-away JWT key and admin password: never ship them -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Erp.Application\Erp.Application.csproj" />
     <ProjectReference Include="..\Erp.Infrastructure\Erp.Infrastructure.csproj" />
   </ItemGroup>
