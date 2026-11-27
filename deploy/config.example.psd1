@@ -1,9 +1,9 @@
-# Server settings. Copy to config.psd1 (next to this file, or into the release's server\ folder) and edit.
+# Server settings. Copy to config.psd1 (next to this file, or into the release's server\ folder), check the names and folders, and use it.
 # config.psd1 holds no passwords: those are generated on the server and kept under <DataRoot>\secrets.
 @{
     # ---- names ----
-    ErpHost      = 'erp.example.com'                       # the ERP and the driver app
-    WebsiteHosts = @('www.example.com', 'example.com')     # the public website; the FIRST one is the canonical address
+    ErpHost      = 'erp.shannana.varx-dev.com'             # the ERP and the driver app (needs its own DNS record)
+    WebsiteHosts = @('shannana.varx-dev.com')              # the public website; the FIRST one is the canonical address
 
     # ---- folders ----
     SitesRoot = 'C:\inetpub\shannana'    # program files (replaced on every upgrade)

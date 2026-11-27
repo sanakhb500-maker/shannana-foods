@@ -6,9 +6,9 @@
 
 ```
 الإنترنت ──► IIS (المنفذان 80 و 443، شهادات HTTPS)
-               ├─ erp.شركتك.com ──► ASP.NET Core داخل IIS ──► SQL Server  (قاعدة ShannanaErp)
+               ├─ erp.shannana.varx-dev.com ──► ASP.NET Core داخل IIS ──► SQL Server  (قاعدة ShannanaErp)
                │                     └─ صور الإثبات في D:\ShannanaData\erp\proofs
-               └─ www.شركتك.com ──► (Reverse proxy / ARR) ──► Node + Express على 127.0.0.1:3000 ──► PostgreSQL (قاعدة shannana)
+               └─ shannana.varx-dev.com ──► (Reverse proxy / ARR) ──► Node + Express على 127.0.0.1:3000 ──► PostgreSQL (قاعدة shannana)
                                      └─ صور المنتجات في D:\ShannanaData\website\products
 ```
 
@@ -22,7 +22,7 @@
 | البند | ملاحظة |
 |---|---|
 | Windows Server 2019 / 2022 | بصلاحيات Administrator، ويفضَّل قرص ثانٍ (D:) للبيانات والنسخ |
-| دومينان فرعيان | مثلاً `erp.شركتك.com` للنظام و`www.شركتك.com` للموقع، بسجل DNS من نوع A يشير إلى IP السيرفر العام |
+| اسمان في DNS | `shannana.varx-dev.com` للموقع و`erp.shannana.varx-dev.com` للنظام (والتطبيق)، كلاهما سجل A يشير إلى IP السيرفر العام. الأول موجود عندك، **أضف الثاني**. |
 | فتح المنفذين 80 و 443 | في جدار حماية الشبكة/الراوتر نحو السيرفر |
 | **.NET 10 Hosting Bundle** | https://dotnet.microsoft.com/download/dotnet/10.0 (ثم `iisreset`) |
 | **IIS URL Rewrite** و**Application Request Routing (ARR)** | https://www.iis.net/downloads |
@@ -79,16 +79,16 @@ notepad config.psd1          # الدومينات، المسارات، أرقا�
 
 1. نزّل **win-acme** من https://www.win-acme.com وفكّه في `C:\tools\win-acme`.
 2. شغّل `wacs.exe` كمسؤول ← `N` (طلب شهادة جديدة) ← اختر موقع IIS: `ShannanaErp` ثم كرّر لـ`ShannanaWebsite` (حدّد كل الدومينات). يُصدر الشهادة، ينشئ ربط https (443)، ويجدّدها تلقائيًا بمهمة مجدولة.
-3. تحقق: `https://erp.شركتك.com` و`https://www.شركتك.com`. أي طلب http يتحوّل تلقائيًا إلى https (ما عدا ملفات التحقق `.well-known`).
+3. تحقق: `https://erp.shannana.varx-dev.com` و`https://shannana.varx-dev.com`. أي طلب http يتحوّل تلقائيًا إلى https (ما عدا ملفات التحقق `.well-known`).
 
 إن كان لديك شهادة جاهزة: ضع بصمتها في `CertThumbprint` داخل `config.psd1` وأعد تشغيل `02` و`03`.
 إن فشل التحقق عبر http لأن DNS لم ينتشر بعد، أعد المحاولة لاحقًا أو استعمل تحقق DNS في win-acme.
 
 ## 6. التحقق بعد التركيب
 
-* `https://erp.شركتك.com/api/v1/health` ← `{"success":true,...}`، ثم الدخول بحساب المدير.
+* `https://erp.shannana.varx-dev.com/api/v1/health` ← `{"success":true,...}`، ثم الدخول بحساب المدير.
 * أنشئ في الـERP: العملات وأسعار الصرف، المستودعات، الأصناف... (البيانات الأولية: عملة محلية + دولار، وحدات، مستودع MAIN، شجرة حسابات).
-* `https://www.شركتك.com` ثم `/admin/login.html` للوحة الموقع، وجرّب رفع صورة منتج (يجب أن تُحفظ في `D:\ShannanaData\website\products`).
+* `https://shannana.varx-dev.com` ثم `/admin/login.html` للوحة الموقع، وجرّب رفع صورة منتج (يجب أن تُحفظ في `D:\ShannanaData\website\products`).
 * السجلات: ERP في `C:\inetpub\shannana\erp\logs` + Event Viewer، الموقع في `D:\ShannanaData\website\logs\website.log`.
 
 ## 7. تطبيق السائق للإنتاج
@@ -97,7 +97,7 @@ notepad config.psd1          # الدومينات، المسارات، أرقا�
 * ابنِ التطبيق على عنوان الإنتاج (HTTPS إلزامي في نسخة release):
 ```powershell
 cd erp\mobile
-flutter build apk --release --dart-define=API_BASE=https://erp.شركتك.com
+flutter build apk --release --dart-define=API_BASE=https://erp.shannana.varx-dev.com
 ```
 * **توقيع التطبيق**: أنشئ مفتاحًا مرة واحدة واحفظه نسخة احتياطية آمنة (إن ضاع لا يمكن تحديث التطبيق على الأجهزة):
 ```powershell
