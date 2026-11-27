@@ -28,11 +28,12 @@ public static class SequenceKeys
     public const string CustomerReceipt = "RCT";
     public const string Journal = "JV";
     public const string ExpenseInvoice = "EXP";
+    public const string PurchaseReturn = "PRT";
     public const string ExpenseVoucher = "EXV";
 
     public static readonly string[] All =
     [
         Transfer, Adjustment, PurchaseOrder, GoodsReceipt, PurchaseInvoice, SupplierPayment,
-        SalesOrder, Delivery, SalesInvoice, SalesReturn, CustomerReceipt, Journal, ExpenseInvoice, ExpenseVoucher,
+        SalesOrder, Delivery, SalesInvoice, SalesReturn, CustomerReceipt, Journal, ExpenseInvoice, ExpenseVoucher, PurchaseReturn,
     ];
 }

@@ -91,8 +91,8 @@ export interface LookupSupplier { id: number; code: string; nameAr: string; name
 export interface LookupCurrency { id: number; code: string; nameAr: string; nameEn: string; symbol: string; isLocal: boolean; isActive: boolean }
 export type ProgressState = 'None' | 'Partial' | 'Full';
 
-export interface SupplierBalanceRow { supplierId: number; code: string; nameAr: string; nameEn: string; invoiced: number; paid: number; balance: number }
-export interface StatementRow { date: string; type: 'Invoice' | 'Payment'; number: string | null; reference: string | null; currencyId: number; amount: number; exchangeRate: number; debit: number; credit: number; balance: number }
+export interface SupplierBalanceRow { supplierId: number; code: string; nameAr: string; nameEn: string; invoiced: number; returned: number; paid: number; balance: number }
+export interface StatementRow { date: string; type: 'Invoice' | 'Return' | 'Payment'; number: string | null; reference: string | null; currencyId: number; amount: number; exchangeRate: number; debit: number; credit: number; balance: number }
 export interface SupplierStatement { supplierId: number; from: string | null; to: string | null; openingBalance: number; rows: StatementRow[]; totalInvoiced: number; totalPaid: number; closingBalance: number }
 
 // ---------- sales and distribution ----------

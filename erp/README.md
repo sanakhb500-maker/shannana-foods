@@ -67,7 +67,7 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 - **Order progress:** confirmed receipts raise `receivedQuantity`, confirmed invoices raise `invoicedQuantity`. A receipt cannot exceed the remaining ordered quantity, and an invoice cannot exceed the received-but-not-yet-invoiced quantity.
 - **Cancelling:** an order with confirmed receipts/invoices cannot be cancelled; a receipt cannot be cancelled while invoices cover its quantities or after its stock was used; cancelling a confirmed receipt reverses the stock movements.
 - **Supplier account** (statement / balances, local currency): confirmed invoices raise what you owe, confirmed payments lower it. Payments are on account (not matched to invoices).
-- **Not in this phase** (accounting phase will handle them): price variances between receipt and invoice, exchange-rate differences, purchase returns, tax.
+- **Not in this phase** (accounting phase will handle them): price variances between receipt and invoice, exchange-rate differences, tax. (Purchase returns and returns linked to invoices came later, see *Returns*.)
 - **Access:** purchasing data carries cost prices, so reading needs Admin, Accountant, Purchasing or StoreKeeper (Sales and Dispatcher get 403). Writing: orders and invoices - Admin/Purchasing; goods receipts - Admin/Purchasing/StoreKeeper; payments - Admin/Accountant.
 
 ## Sales and distribution rules (phase 4)
@@ -75,11 +75,11 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 - **Order progress:** a delivery cannot exceed the remaining ordered quantity; an invoice cannot exceed the delivered-but-not-yet-invoiced quantity. Orders with confirmed deliveries/invoices cannot be cancelled; a delivery cannot be cancelled while invoices cover it or after its trip has left.
 - **Cost of goods sold:** a confirmed delivery records the warehouse's average cost on each line (`unitCost`) for the accounting phase.
 - **Credit limit:** confirming an invoice is refused if it would push the customer's balance (confirmed invoices - returns - receipts, local currency) above their credit limit. 0 = no limit.
-- **Returns:** a confirmed return puts goods back in stock at the warehouse's current average cost (so the average is not distorted) and credits the customer. They are standalone (not matched to an invoice).
+- **Returns:** a confirmed return puts goods back in stock at the warehouse's current average cost (so the average is not distorted) and credits the customer. They may be linked to an invoice (see *Returns* below) or standalone.
 - **Customer account** (statement / balances): invoices raise what the customer owes; returns and receipts lower it. Receipts are on account.
-- **Trips:** a trip = driver + vehicle + ordered stops (delivery notes). Planned (editable) -> In transit (needs every delivery confirmed; record Delivered/Failed per stop) -> Completed (no Pending stops). One driver / one vehicle per day. A delivery can be on one live trip at a time; a **delivered** stop is final, a **failed** one can be planned again. A failed stop does not move stock back by itself: cancel the delivery note if the goods return.
+- **Trips:** a trip = driver + vehicle + ordered stops (delivery notes). Planned (editable) -> In transit (needs every delivery confirmed; record Delivered/Failed per stop) -> Completed (no Pending stops). One driver / one vehicle per day. A delivery can be on one live trip at a time; a **delivered** stop is final, a **failed** one can be planned again. When a trip is **completed**, the delivery note of every *failed* stop is cancelled automatically (goods back in stock, GL reversed), in the same transaction; if that delivery cannot be cancelled (e.g. it is already invoiced) completion is refused with the reason. Cancelled deliveries do not return to the unassigned pool.
 - **Access:** reading sales data needs Admin, Accountant, Sales, Dispatcher or StoreKeeper (Purchasing gets 403). Writing: orders and invoices - Admin/Sales; deliveries and returns - Admin/Sales/StoreKeeper; trips - Admin/Dispatcher; customer receipts - Admin/Accountant.
-- **Not in this phase:** tax, price lists/discounts, returns matched to invoices, vehicle capacity checks (items have no weight yet).
+- **Not in this phase:** tax, price lists/discounts, vehicle capacity checks (items have no weight yet).
 
 ## Accounting rules (phase 5)
 - **Double entry, local currency.** Every journal line is a debit or a credit (never both, never negative) in LOCAL currency; each entry balances to the unit. Documents carry their own exchange-rate snapshot, so foreign-currency documents post at that rate. Foreign-currency revaluation and exchange differences are not modelled.
@@ -94,6 +94,7 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 | Sales invoice confirmed | Receivables (customer) | Sales revenue |
 | Sales return confirmed | Sales returns (contra revenue) + Inventory | Receivables (customer) + Cost of goods sold |
 | Customer receipt confirmed | Cash / Bank | Receivables (customer) |
+| Purchase return confirmed | Payables (supplier) | Inventory (at average cost) + GRNI for any price/cost difference |
 | Stock adjustment (opening balance) | Inventory | Opening balance equity |
 | Stock adjustment (count / damage) | Inventory / Inventory adjustments | Inventory adjustments / Inventory |
 
@@ -122,6 +123,10 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 JWT in an HttpOnly cookie (`erp_auth`) plus a double-submit CSRF token (`erp_csrf` cookie echoed in `X-CSRF-Token`) on writes.
 Roles: Admin, Accountant, StoreKeeper, Purchasing, Sales, Dispatcher. Everyone signed in can read master data; writes are limited per area
 (see `Erp.Domain/Common/Roles.cs`, mirrored for the UI in `web/src/app/core/models.ts`). Deactivated users lose access immediately.
+
+## Returns
+- **Purchase returns** (`PRT-` numbers): confirming takes the goods out of the warehouse at its average cost and lowers what we owe the supplier (Dr Payables at the return price, Cr Inventory at cost, difference to *Goods received not invoiced*). Cancelling reverses both. Supplier statement/balances show them; the Payables reconciliation counts them.
+- **Linking to an invoice** (purchase returns -> purchase invoice, sales returns -> sales invoice; optional): the invoice must be confirmed, same supplier/customer and currency, items must be on it, and per item the returned quantity cannot exceed *invoiced - already returned (confirmed)*. A confirmed linked return reduces the invoice's **outstanding** amount (open invoices, ageing, allocation cap, revaluation). An invoice with confirmed linked returns cannot be cancelled until they are cancelled. From a confirmed invoice screen, *Create return* pre-fills a return.
 
 ## Tests
 ```powershell

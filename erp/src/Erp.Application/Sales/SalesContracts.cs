@@ -24,7 +24,7 @@ public sealed record SalesInvoiceInput(DateOnly Date, DateOnly? DueDate, int Cus
 public sealed record ReturnLineInput(int ItemId, decimal Quantity, decimal UnitPrice);
 
 public sealed record SalesReturnInput(DateOnly Date, int CustomerId, int WarehouseId, int CurrencyId, decimal? ExchangeRate,
-    string? Notes, List<ReturnLineInput> Lines);
+    string? Notes, List<ReturnLineInput> Lines, int? SalesInvoiceId = null);
 
 public sealed record CustomerReceiptInput(DateOnly Date, int CustomerId, int CurrencyId, decimal? ExchangeRate, decimal Amount,
     PaymentMethod Method, string? Reference, string? Notes, List<AllocationInput>? Allocations = null);
@@ -52,7 +52,7 @@ public sealed record DeliveryNoteRow(int Id, string? Number, DateOnly Date, int 
 public sealed record SalesInvoiceRow(int Id, string? Number, DateOnly Date, DateOnly? DueDate, int CustomerId, int? SalesOrderId, int CurrencyId,
     DocumentStatus Status, decimal TotalAmount);
 
-public sealed record SalesReturnRow(int Id, string? Number, DateOnly Date, int CustomerId, int WarehouseId, int CurrencyId,
+public sealed record SalesReturnRow(int Id, string? Number, DateOnly Date, int CustomerId, int WarehouseId, int? SalesInvoiceId, int CurrencyId,
     DocumentStatus Status, decimal TotalAmount, int LineCount);
 
 public sealed record TripRow(int Id, string? Number, DateOnly Date, int DriverId, int VehicleId, TripStatus Status, int StopCount, int DeliveredCount);

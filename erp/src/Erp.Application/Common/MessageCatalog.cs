@@ -61,6 +61,7 @@ public static class MessageCatalog
         ("Delivery note not found.", "سند التسليم غير موجود."),
         ("Sales invoice not found.", "فاتورة المبيعات غير موجودة."),
         ("Sales return not found.", "مرتجع المبيعات غير موجود."),
+        ("Purchase return not found.", "مرتجع المشتريات غير موجود."),
         ("Receipt not found.", "سند القبض غير موجود."),
         ("Trip not found.", "الرحلة غير موجودة."),
         ("Stop not found.", "المحطة غير موجودة."),
@@ -97,6 +98,15 @@ public static class MessageCatalog
         ("An item may appear only once per invoice.", "لا يجوز تكرار الصنف في الفاتورة الواحدة."),
         ("An item may appear only once per delivery note.", "لا يجوز تكرار الصنف في سند التسليم الواحد."),
         ("An item may appear only once per return.", "لا يجوز تكرار الصنف في المرتجع الواحد."),
+        ("The purchase invoice does not exist.", "فاتورة المورد غير موجودة."),
+        ("The sales invoice does not exist.", "فاتورة المبيعات غير موجودة."),
+        ("Only a confirmed invoice can be linked to a return.", "لا يمكن ربط المرتجع إلا بفاتورة مؤكدة."),
+        ("The supplier differs from the invoice's supplier.", "المورد يختلف عن مورد الفاتورة."),
+        ("The customer differs from the invoice's customer.", "العميل يختلف عن عميل الفاتورة."),
+        ("The currency differs from the invoice's currency.", "العملة تختلف عن عملة الفاتورة."),
+        ("Item {code} is not on the linked invoice.", "الصنف {code} غير موجود في الفاتورة المرتبطة."),
+        ("Returned quantity for item {code} exceeds what was invoiced and not yet returned ({qty}).", "كمية المرتجع للصنف {code} تتجاوز ما فُوتر ولم يُرجَع بعد ({qty})."),
+        ("Returns are already linked to this invoice. Cancel them first.", "توجد مرتجعات مرتبطة بهذه الفاتورة. ألغِها أولًا."),
 
         // ----- purchasing -----
         ("The purchase order does not exist.", "أمر الشراء غير موجود."),

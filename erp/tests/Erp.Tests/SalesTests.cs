@@ -419,15 +419,15 @@ public class SalesTests(ErpFactory factory) : IClassFixture<ErpFactory>
 
         await FailAsync(s, HttpMethod.Post, $"/api/v1/trips/{tid}/cancel", null); // completed trips cannot be cancelled
 
-        // delivered stops are finished business; a failed one can be planned again
+        // a failed stop sends the goods back: its delivery is cancelled and the stock returns; a delivered one is finished business
+        Assert.Equal(48m, (await BalanceAsync(s, wh, item)).Qty); // 50 - 3 - 2, then the failed 3 came back
+        Assert.Equal("Cancelled", (await OkAsync(s, HttpMethod.Get, $"/api/v1/deliverynotes/{d1}")).GetProperty("status").GetString());
         var pool = (await OkAsync(s, HttpMethod.Get, "/api/v1/deliverynotes?unassignedOnly=true&pageSize=200")).GetProperty("items").EnumerateArray()
             .Select(r => r.GetProperty("id").GetInt32()).ToList();
         Assert.DoesNotContain(d2, pool);
-        Assert.Contains(d1, pool);
+        Assert.DoesNotContain(d1, pool);
         Assert.Contains("already delivered", await FailAsync(s, HttpMethod.Post, "/api/v1/trips",
             new { date = "2026-11-15", driverId = await NewDriverAsync(s), vehicleId = await NewVehicleAsync(s), deliveryNoteIds = new[] { d2 } }));
-        await OkAsync(s, HttpMethod.Post, "/api/v1/trips",
-            new { date = "2026-11-15", driverId = await NewDriverAsync(s), vehicleId = await NewVehicleAsync(s), deliveryNoteIds = new[] { d1 } }, HttpStatusCode.Created);
     }
 
     [Fact]

@@ -431,6 +431,8 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         if (inv.Status == DocumentStatus.Confirmed && await db.SupplierPaymentAllocations.AnyAsync(a => a.PurchaseInvoiceId == id &&
                 db.SupplierPayments.Any(p => p.Id == a.SupplierPaymentId && p.Status == DocumentStatus.Confirmed), ct))
             throw new BusinessRuleException("Payments are already allocated to this invoice. Cancel them first.");
+        if (inv.Status == DocumentStatus.Confirmed && await db.PurchaseReturns.AnyAsync(r => r.PurchaseInvoiceId == id && r.Status == DocumentStatus.Confirmed, ct))
+            throw new BusinessRuleException("Returns are already linked to this invoice. Cancel them first.");
 
         if (inv.Status == DocumentStatus.Confirmed && inv.PurchaseOrderId is { } oid)
         {
@@ -442,6 +444,142 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         inv.Status = DocumentStatus.Cancelled;
         await SaveAsync(ct);
         return inv;
+    }
+
+    // =====================================================================
+    //  Purchase returns (stock out, credit from the supplier)
+    // =====================================================================
+
+    public async Task<PagedResult<PurchaseReturnRow>> ListReturnsAsync(PurchasingFilter f, CancellationToken ct)
+    {
+        var q = db.PurchaseReturns.AsNoTracking().AsQueryable();
+        if (f.Status is { } st) q = q.Where(r => r.Status == st);
+        if (f.SupplierId is { } sid) q = q.Where(r => r.SupplierId == sid);
+        if (!string.IsNullOrWhiteSpace(f.Q)) { var s = Like(f.Q); q = q.Where(r => (r.Number != null && r.Number.Contains(s)) || (r.Notes != null && r.Notes.Contains(s))); }
+
+        var (page, size) = Paging(f.Page, f.PageSize);
+        var total = await q.CountAsync(ct);
+        var rows = await q.OrderByDescending(r => r.Date).ThenByDescending(r => r.Id).Skip((page - 1) * size).Take(size)
+            .Select(r => new PurchaseReturnRow(r.Id, r.Number, r.Date, r.SupplierId, r.WarehouseId, r.PurchaseInvoiceId, r.CurrencyId, r.Status, r.TotalAmount, r.Lines.Count))
+            .ToListAsync(ct);
+        return new PagedResult<PurchaseReturnRow>(rows, total, page, size);
+    }
+
+    public async Task<PurchaseReturn> GetReturnAsync(int id, CancellationToken ct) =>
+        await db.PurchaseReturns.AsNoTracking().Include(r => r.Lines).FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw new NotFoundException("Purchase return not found.");
+
+    private async Task<PurchaseReturn> LoadReturnAsync(int id, CancellationToken ct) =>
+        await db.PurchaseReturns.Include(r => r.Lines).FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw new NotFoundException("Purchase return not found.");
+
+    private static List<PurchaseReturnLine> ReturnLines(IEnumerable<PurchaseReturnLineInput> lines) =>
+        lines.Select(l => new PurchaseReturnLine { ItemId = l.ItemId, Quantity = l.Quantity, UnitPrice = l.UnitPrice }).ToList();
+
+    /// <summary>A return linked to an invoice must match its supplier and currency, use only items on it, and stay within what was invoiced and not yet returned.</summary>
+    private async Task ValidateReturnAsync(PurchaseReturnInput i, int? returnId, CancellationToken ct)
+    {
+        await EnsureSupplierAsync(i.SupplierId, ct);
+        await db.EnsureWarehouseAsync(i.WarehouseId, ct);
+        await db.EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
+        if (i.PurchaseInvoiceId is not { } invoiceId) return;
+
+        var inv = await db.PurchaseInvoices.AsNoTracking().Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == invoiceId, ct)
+                  ?? throw new BusinessRuleException("The purchase invoice does not exist.");
+        if (inv.Status != DocumentStatus.Confirmed) throw new BusinessRuleException("Only a confirmed invoice can be linked to a return.");
+        if (inv.SupplierId != i.SupplierId) throw new BusinessRuleException("The supplier differs from the invoice's supplier.");
+        if (inv.CurrencyId != i.CurrencyId) throw new BusinessRuleException("The currency differs from the invoice's currency.");
+
+        var returned = (await db.PurchaseReturnLines.AsNoTracking()
+            .Where(l => db.PurchaseReturns.Any(r => r.Id == l.PurchaseReturnId && r.PurchaseInvoiceId == invoiceId && r.Status == DocumentStatus.Confirmed && (returnId == null || r.Id != returnId)))
+            .GroupBy(l => l.ItemId).Select(g => new { Item = g.Key, Qty = g.Sum(x => x.Quantity) }).ToListAsync(ct))
+            .ToDictionary(x => x.Item, x => x.Qty);
+
+        foreach (var line in i.Lines)
+        {
+            var invoiced = inv.Lines.Where(l => l.ItemId == line.ItemId).Sum(l => l.Quantity);
+            var code = await db.Items.Where(x => x.Id == line.ItemId).Select(x => x.Code).FirstAsync(ct);
+            if (invoiced == 0) throw new BusinessRuleException($"Item {code} is not on the linked invoice.");
+            var remaining = invoiced - returned.GetValueOrDefault(line.ItemId);
+            if (line.Quantity > remaining)
+                throw new BusinessRuleException($"Returned quantity for item {code} exceeds what was invoiced and not yet returned ({remaining:0.####}).");
+        }
+    }
+
+    private static PurchaseReturnInput AsInput(PurchaseReturn r) =>
+        new(r.Date, r.SupplierId, r.WarehouseId, r.PurchaseInvoiceId, r.CurrencyId, r.ExchangeRate, r.Notes,
+            r.Lines.Select(l => new PurchaseReturnLineInput(l.ItemId, l.Quantity, l.UnitPrice)).ToList());
+
+    public async Task<PurchaseReturn> CreateReturnAsync(PurchaseReturnInput i, CancellationToken ct)
+    {
+        await ValidateReturnAsync(i, null, ct);
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, null, ct);
+        var r = new PurchaseReturn
+        {
+            Date = i.Date, SupplierId = i.SupplierId, WarehouseId = i.WarehouseId, PurchaseInvoiceId = i.PurchaseInvoiceId, CurrencyId = i.CurrencyId,
+            ExchangeRate = rate, Notes = Clean(i.Notes), Status = DocumentStatus.Draft, Lines = ReturnLines(i.Lines),
+            TotalAmount = i.Lines.Sum(l => R4(l.Quantity * l.UnitPrice)),
+        };
+        db.PurchaseReturns.Add(r);
+        await SaveAsync(ct);
+        return r;
+    }
+
+    public async Task<PurchaseReturn> UpdateReturnAsync(int id, PurchaseReturnInput i, CancellationToken ct)
+    {
+        var r = await LoadReturnAsync(id, ct);
+        EnsureDraft(r.Status);
+        await ValidateReturnAsync(i, id, ct);
+        var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, r.CurrencyId == i.CurrencyId ? r.ExchangeRate : null, ct);
+        r.Date = i.Date; r.SupplierId = i.SupplierId; r.WarehouseId = i.WarehouseId; r.PurchaseInvoiceId = i.PurchaseInvoiceId;
+        r.CurrencyId = i.CurrencyId; r.ExchangeRate = rate; r.Notes = Clean(i.Notes);
+        db.PurchaseReturnLines.RemoveRange(r.Lines);
+        r.Lines = ReturnLines(i.Lines);
+        r.TotalAmount = i.Lines.Sum(l => R4(l.Quantity * l.UnitPrice));
+        await SaveAsync(ct);
+        return r;
+    }
+
+    public async Task<PurchaseReturn> ConfirmReturnAsync(int id, CancellationToken ct)
+    {
+        var r = await LoadReturnAsync(id, ct);
+        EnsureDraft(r.Status);
+        r.Number = await numbers.NextAsync(SequenceKeys.PurchaseReturn, ct);
+        await ValidateReturnAsync(AsInput(r), r.Id, ct);
+
+        // Goods leave at the warehouse's average cost; the supplier is credited at the return price.
+        var src = new PostingSource(r.Date, DocumentTypes.PurchaseReturn, r.Id, r.Number);
+        var costValue = 0m;
+        foreach (var line in r.Lines)
+        {
+            var cost = await poster.IssueAsync(src, line.ItemId, r.WarehouseId, line.Quantity, MovementType.PurchaseReturn, null, ct);
+            line.UnitCost = cost;
+            costValue += R4(line.Quantity * cost);
+        }
+        var credit = R4(r.TotalAmount * r.ExchangeRate);
+        var diff = credit - costValue; // credit above cost: the surplus stays in GRNI for the accountant, like any price difference
+        await gl.PostAsync(SourceTypes.PurchaseReturn, r.Id, r.Date, $"Purchase return {r.Number}", ct,
+            new PostLine(AccountRoles.Payables, credit, 0, PartyType.Supplier, r.SupplierId),
+            new PostLine(AccountRoles.Inventory, 0, costValue),
+            new PostLine(AccountRoles.GoodsReceivedNotInvoiced, diff < 0 ? -diff : 0, diff > 0 ? diff : 0));
+
+        r.Status = DocumentStatus.Confirmed;
+        r.ConfirmedAt = DateTime.UtcNow;
+        r.ConfirmedBy = user.UserName;
+        await SaveAsync(ct);
+        return r;
+    }
+
+    public async Task<PurchaseReturn> CancelReturnAsync(int id, CancellationToken ct)
+    {
+        var r = await LoadReturnAsync(id, ct);
+        if (r.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
+        if (r.Status == DocumentStatus.Confirmed)
+        {
+            await poster.ReverseDocumentAsync(DocumentTypes.PurchaseReturn, r.Id, r.Number, ct);
+            await gl.ReverseAsync(SourceTypes.PurchaseReturn, r.Id, $"Cancelled purchase return {r.Number}", ct);
+        }
+        r.Status = DocumentStatus.Cancelled;
+        await SaveAsync(ct);
+        return r;
     }
 
     // =====================================================================
@@ -468,7 +606,10 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         var q = db.SupplierPaymentAllocations.AsNoTracking().Where(a => db.SupplierPayments.Any(p =>
             p.Id == a.SupplierPaymentId && p.Status == DocumentStatus.Confirmed && (exceptPaymentId == null || p.Id != exceptPaymentId)));
         q = kind == InvoiceKinds.PurchaseInvoice ? q.Where(a => a.PurchaseInvoiceId == id) : q.Where(a => a.ExpenseInvoiceId == id);
-        return await q.SumAsync(a => (decimal?)a.Amount, ct) ?? 0m;
+        var settled = await q.SumAsync(a => (decimal?)a.Amount, ct) ?? 0m;
+        // goods returned against a purchase invoice reduce what is still owed on it
+        if (kind != InvoiceKinds.PurchaseInvoice) return settled;
+        return settled + (await db.PurchaseReturns.AsNoTracking().Where(r => r.PurchaseInvoiceId == id && r.Status == DocumentStatus.Confirmed).SumAsync(r => (decimal?)r.TotalAmount, ct) ?? 0m);
     }
 
     private async Task ValidateAllocationsAsync(int supplierId, int currencyId, decimal amount, List<AllocationInput>? allocations, int? paymentId, CancellationToken ct)
@@ -623,10 +764,13 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
             .Select(i => new { i.Id, i.Date, i.Number, Ref = i.SupplierInvoiceNumber, i.CurrencyId, i.TotalAmount, i.ExchangeRate }).ToListAsync(ct);
         var payments = await db.SupplierPayments.AsNoTracking()
             .Where(p => p.SupplierId == supplierId && p.Status == DocumentStatus.Confirmed).ToListAsync(ct);
+        var returns = await db.PurchaseReturns.AsNoTracking().Where(r => r.SupplierId == supplierId && r.Status == DocumentStatus.Confirmed)
+            .Select(r => new { r.Id, r.Date, r.Number, r.CurrencyId, r.TotalAmount, r.ExchangeRate }).ToListAsync(ct);
 
         // (date, kind order, id) keeps same-day entries stable: invoices before payments.
         var entries = invoices.Concat(expenses).Select(i => (i.Date, Order: 0, i.Id, Type: "Invoice", i.Number, i.Ref, i.CurrencyId, Amount: i.TotalAmount, i.ExchangeRate, Debit: 0m, Credit: R4(i.TotalAmount * i.ExchangeRate)))
-            .Concat(payments.Select(p => (p.Date, Order: 1, p.Id, Type: "Payment", p.Number, Ref: p.Reference, p.CurrencyId, Amount: p.Amount, p.ExchangeRate, Debit: Cleared(p), Credit: 0m)))
+            .Concat(returns.Select(r => (r.Date, Order: 1, r.Id, Type: "Return", r.Number, Ref: (string?)null, r.CurrencyId, Amount: r.TotalAmount, r.ExchangeRate, Debit: R4(r.TotalAmount * r.ExchangeRate), Credit: 0m)))
+            .Concat(payments.Select(p => (p.Date, Order: 2, p.Id, Type: "Payment", p.Number, Ref: p.Reference, p.CurrencyId, Amount: p.Amount, p.ExchangeRate, Debit: Cleared(p), Credit: 0m)))
             .OrderBy(e => e.Date).ThenBy(e => e.Order).ThenBy(e => e.Id).ToList();
 
         var opening = from is { } f ? entries.Where(e => e.Date < f).Sum(e => e.Credit - e.Debit) : 0m;
@@ -648,15 +792,18 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
             .GroupBy(i => i.SupplierId).Select(g => new { Id = g.Key, Sum = g.Sum(i => Math.Round(i.TotalAmount * i.ExchangeRate, 4)) }).ToListAsync(ct);
         var paid = await db.SupplierPayments.AsNoTracking().Where(p => p.Status == DocumentStatus.Confirmed)
             .GroupBy(p => p.SupplierId).Select(g => new { Id = g.Key, Sum = g.Sum(p => p.LocalSettled ?? Math.Round(p.Amount * p.ExchangeRate, 4)) }).ToListAsync(ct);
+        var returned = await db.PurchaseReturns.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed)
+            .GroupBy(r => r.SupplierId).Select(g => new { Id = g.Key, Sum = g.Sum(r => Math.Round(r.TotalAmount * r.ExchangeRate, 4)) }).ToListAsync(ct);
 
-        var ids = invoiced.Select(x => x.Id).Union(expenses.Select(x => x.Id)).Union(paid.Select(x => x.Id)).ToList();
+        var ids = invoiced.Select(x => x.Id).Union(expenses.Select(x => x.Id)).Union(paid.Select(x => x.Id)).Union(returned.Select(x => x.Id)).ToList();
         var suppliers = await db.Suppliers.AsNoTracking().Where(s => ids.Contains(s.Id)).ToListAsync(ct);
 
         return suppliers.Select(s =>
         {
             var inv = (invoiced.FirstOrDefault(x => x.Id == s.Id)?.Sum ?? 0m) + (expenses.FirstOrDefault(x => x.Id == s.Id)?.Sum ?? 0m);
             var pay = paid.FirstOrDefault(x => x.Id == s.Id)?.Sum ?? 0m;
-            return new SupplierBalanceRow(s.Id, s.Code, s.NameAr, s.NameEn, inv, pay, inv - pay);
+            var ret = returned.FirstOrDefault(x => x.Id == s.Id)?.Sum ?? 0m;
+            return new SupplierBalanceRow(s.Id, s.Code, s.NameAr, s.NameEn, inv, ret, pay, inv - ret - pay);
         }).OrderByDescending(r => r.Balance).ThenBy(r => r.Code).ToList();
     }
 
@@ -671,6 +818,8 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         var allocs = await db.SupplierPaymentAllocations.AsNoTracking()
             .Where(a => db.SupplierPayments.Any(p => p.Id == a.SupplierPaymentId && p.Status == DocumentStatus.Confirmed)).ToListAsync(ct);
         var byPurchase = allocs.Where(a => a.PurchaseInvoiceId != null).GroupBy(a => a.PurchaseInvoiceId!.Value).ToDictionary(g => g.Key, g => g.Sum(a => a.Amount));
+        foreach (var g in (await db.PurchaseReturns.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed && r.PurchaseInvoiceId != null).ToListAsync(ct)).GroupBy(r => r.PurchaseInvoiceId!.Value))
+            byPurchase[g.Key] = byPurchase.GetValueOrDefault(g.Key) + g.Sum(r => r.TotalAmount);
         var byExpense = allocs.Where(a => a.ExpenseInvoiceId != null).GroupBy(a => a.ExpenseInvoiceId!.Value).ToDictionary(g => g.Key, g => g.Sum(a => a.Amount));
 
         OpenInvoiceRow? Row(string kind, int id, string? number, DateOnly date, DateOnly? due, int cur, decimal rate, decimal total, decimal settled)

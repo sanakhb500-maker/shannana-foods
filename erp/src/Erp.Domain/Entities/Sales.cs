@@ -104,6 +104,8 @@ public class SalesReturn : AuditableEntity
     public DateOnly Date { get; set; }
     public int CustomerId { get; set; }
     public int WarehouseId { get; set; }
+    /// <summary>Optional: the invoice these goods were sold on. A linked return cannot exceed what was invoiced and reduces that invoice's outstanding amount.</summary>
+    public int? SalesInvoiceId { get; set; }
     public int CurrencyId { get; set; }
     public decimal ExchangeRate { get; set; } = 1m;
     public DocumentStatus Status { get; set; } = DocumentStatus.Draft;

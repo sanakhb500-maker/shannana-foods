@@ -153,6 +153,47 @@ public class PurchaseInvoicesController(IPurchasingService svc, IValidator<Purch
 }
 
 [ApiController]
+[Route("api/v1/purchasereturns")]
+public class PurchaseReturnsController(IPurchasingService svc, IValidator<PurchaseReturnInput> validator, IAuthorizationService auth)
+    : PurchasingControllerBase(auth)
+{
+    protected override string WritePolicy => Policies.ManagePurchasing;
+
+    [HttpGet]
+    public async Task<IActionResult> List([FromQuery] DocumentStatus? status, [FromQuery] int? supplierId, [FromQuery] string? q,
+        [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
+        Ok(ApiResponse.Ok(await svc.ListReturnsAsync(new PurchasingFilter(status, supplierId, q, false, page, pageSize), ct)));
+
+    [HttpGet("{id:int}")]
+    public async Task<IActionResult> Get(int id, CancellationToken ct) => Ok(ApiResponse.Ok(await svc.GetReturnAsync(id, ct)));
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] PurchaseReturnInput input, CancellationToken ct)
+    {
+        if (!await CanWriteAsync()) return Forbid();
+        if (await InvalidAsync(validator, input, ct) is { } bad) return bad;
+        var created = await svc.CreateReturnAsync(input, ct);
+        return CreatedAtAction(nameof(Get), new { id = created.Id }, ApiResponse.Ok(created));
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(int id, [FromBody] PurchaseReturnInput input, CancellationToken ct)
+    {
+        if (!await CanWriteAsync()) return Forbid();
+        if (await InvalidAsync(validator, input, ct) is { } bad) return bad;
+        return Ok(ApiResponse.Ok(await svc.UpdateReturnAsync(id, input, ct)));
+    }
+
+    [HttpPost("{id:int}/confirm")]
+    public async Task<IActionResult> Confirm(int id, CancellationToken ct) =>
+        !await CanWriteAsync() ? Forbid() : Ok(ApiResponse.Ok(await svc.ConfirmReturnAsync(id, ct)));
+
+    [HttpPost("{id:int}/cancel")]
+    public async Task<IActionResult> Cancel(int id, CancellationToken ct) =>
+        !await CanWriteAsync() ? Forbid() : Ok(ApiResponse.Ok(await svc.CancelReturnAsync(id, ct)));
+}
+
+[ApiController]
 [Route("api/v1/supplierpayments")]
 public class SupplierPaymentsController(IPurchasingService svc, IValidator<SupplierPaymentInput> validator, IAuthorizationService auth)
     : PurchasingControllerBase(auth)

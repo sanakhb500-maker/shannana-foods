@@ -106,6 +106,7 @@ export class Shell {
     { path: '/purchase-orders', label: 'nav.purchaseOrders' },
     { path: '/goods-receipts', label: 'nav.goodsReceipts' },
     { path: '/purchase-invoices', label: 'nav.purchaseInvoices' },
+    { path: '/purchase-returns', label: 'nav.purchaseReturns' },
     { path: '/supplier-payments', label: 'nav.supplierPayments' },
     { path: '/expense-invoices', label: 'nav.expenseInvoices' },
     { path: '/supplier-ageing', label: 'nav.supplierAgeing' },

@@ -181,8 +181,8 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         if (f.Status is { } st) q = q.Where(d => d.Status == st);
         if (f.CustomerId is { } cid) q = q.Where(d => d.CustomerId == cid);
         if (f.UnassignedOnly)
-            // Available = not on a live trip, and not already handed over on a completed one (a failed stop can be re-planned).
-            q = q.Where(d => !db.TripStops.Any(s => s.DeliveryNoteId == d.Id &&
+            // Available = not cancelled (a failed stop cancels its delivery), not on a live trip, and not already handed over on a completed one.
+            q = q.Where(d => d.Status != DocumentStatus.Cancelled && !db.TripStops.Any(s => s.DeliveryNoteId == d.Id &&
                 db.DistributionTrips.Any(t => t.Id == s.TripId &&
                     (t.Status == TripStatus.Planned || t.Status == TripStatus.InTransit ||
                      (t.Status == TripStatus.Completed && s.Status == StopStatus.Delivered)))));
@@ -309,9 +309,17 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     public async Task<DeliveryNote> CancelDeliveryAsync(int id, CancellationToken ct)
     {
         var d = await LoadDeliveryAsync(id, ct);
+        await CancelDeliveryCoreAsync(d, true, ct);
+        await SaveAsync(ct);
+        return d;
+    }
+
+    /// <summary>Stages the cancellation (stock back, order quantities, GL reversal) without saving. A trip that has already left blocks it unless the trip itself is cancelling a failed stop.</summary>
+    private async Task CancelDeliveryCoreAsync(DeliveryNote d, bool checkTrip, CancellationToken ct)
+    {
         if (d.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
 
-        var onActiveTrip = await (from s in db.TripStops
+        var onActiveTrip = !checkTrip ? null : await (from s in db.TripStops
                                   join t in db.DistributionTrips on s.TripId equals t.Id
                                   where s.DeliveryNoteId == d.Id && (t.Status == TripStatus.InTransit || t.Status == TripStatus.Completed)
                                   select t.Number).FirstOrDefaultAsync(ct);
@@ -335,8 +343,6 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
             await gl.ReverseAsync(SourceTypes.DeliveryNote, d.Id, $"Cancelled delivery {d.Number}", ct);
         }
         d.Status = DocumentStatus.Cancelled;
-        await SaveAsync(ct);
-        return d;
     }
 
     // =====================================================================
@@ -467,6 +473,8 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         if (inv.Status == DocumentStatus.Confirmed && await db.CustomerReceiptAllocations.AnyAsync(a => a.SalesInvoiceId == id &&
                 db.CustomerReceipts.Any(r => r.Id == a.CustomerReceiptId && r.Status == DocumentStatus.Confirmed), ct))
             throw new BusinessRuleException("Payments are already allocated to this invoice. Cancel them first.");
+        if (inv.Status == DocumentStatus.Confirmed && await db.SalesReturns.AnyAsync(r => r.SalesInvoiceId == id && r.Status == DocumentStatus.Confirmed, ct))
+            throw new BusinessRuleException("Returns are already linked to this invoice. Cancel them first.");
 
         if (inv.Status == DocumentStatus.Confirmed && inv.SalesOrderId is { } oid)
         {
@@ -494,7 +502,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         var (page, size) = Paging(f.Page, f.PageSize);
         var total = await q.CountAsync(ct);
         var rows = await q.OrderByDescending(r => r.Date).ThenByDescending(r => r.Id).Skip((page - 1) * size).Take(size)
-            .Select(r => new SalesReturnRow(r.Id, r.Number, r.Date, r.CustomerId, r.WarehouseId, r.CurrencyId, r.Status, r.TotalAmount, r.Lines.Count))
+            .Select(r => new SalesReturnRow(r.Id, r.Number, r.Date, r.CustomerId, r.WarehouseId, r.SalesInvoiceId, r.CurrencyId, r.Status, r.TotalAmount, r.Lines.Count))
             .ToListAsync(ct);
         return new PagedResult<SalesReturnRow>(rows, total, page, size);
     }
@@ -510,16 +518,48 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     private static List<SalesReturnLine> ReturnLines(IEnumerable<ReturnLineInput> lines) =>
         lines.Select(l => new SalesReturnLine { ItemId = l.ItemId, Quantity = l.Quantity, UnitPrice = l.UnitPrice }).ToList();
 
-    public async Task<SalesReturn> CreateReturnAsync(SalesReturnInput i, CancellationToken ct)
+    /// <summary>A return linked to an invoice must match its customer and currency, use only items on it, and stay within what was invoiced and not yet returned.</summary>
+    private async Task ValidateReturnAsync(SalesReturnInput i, int? returnId, CancellationToken ct)
     {
         await EnsureCustomerAsync(i.CustomerId, ct);
         await db.EnsureWarehouseAsync(i.WarehouseId, ct);
         await db.EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
+        if (i.SalesInvoiceId is not { } invoiceId) return;
+
+        var inv = await db.SalesInvoices.AsNoTracking().Include(x => x.Lines).FirstOrDefaultAsync(x => x.Id == invoiceId, ct)
+                  ?? throw new BusinessRuleException("The sales invoice does not exist.");
+        if (inv.Status != DocumentStatus.Confirmed) throw new BusinessRuleException("Only a confirmed invoice can be linked to a return.");
+        if (inv.CustomerId != i.CustomerId) throw new BusinessRuleException("The customer differs from the invoice's customer.");
+        if (inv.CurrencyId != i.CurrencyId) throw new BusinessRuleException("The currency differs from the invoice's currency.");
+
+        var returned = (await db.SalesReturnLines.AsNoTracking()
+            .Where(l => db.SalesReturns.Any(r => r.Id == l.SalesReturnId && r.SalesInvoiceId == invoiceId && r.Status == DocumentStatus.Confirmed && (returnId == null || r.Id != returnId)))
+            .GroupBy(l => l.ItemId).Select(g => new { Item = g.Key, Qty = g.Sum(x => x.Quantity) }).ToListAsync(ct))
+            .ToDictionary(x => x.Item, x => x.Qty);
+
+        foreach (var line in i.Lines)
+        {
+            var invoiced = inv.Lines.Where(l => l.ItemId == line.ItemId).Sum(l => l.Quantity);
+            var code = await db.Items.Where(x => x.Id == line.ItemId).Select(x => x.Code).FirstAsync(ct);
+            if (invoiced == 0) throw new BusinessRuleException($"Item {code} is not on the linked invoice.");
+            var remaining = invoiced - returned.GetValueOrDefault(line.ItemId);
+            if (line.Quantity > remaining)
+                throw new BusinessRuleException($"Returned quantity for item {code} exceeds what was invoiced and not yet returned ({remaining:0.####}).");
+        }
+    }
+
+    private static SalesReturnInput AsInput(SalesReturn r) =>
+        new(r.Date, r.CustomerId, r.WarehouseId, r.CurrencyId, r.ExchangeRate, r.Notes,
+            r.Lines.Select(l => new ReturnLineInput(l.ItemId, l.Quantity, l.UnitPrice)).ToList(), r.SalesInvoiceId);
+
+    public async Task<SalesReturn> CreateReturnAsync(SalesReturnInput i, CancellationToken ct)
+    {
+        await ValidateReturnAsync(i, null, ct);
         var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, null, ct);
 
         var r = new SalesReturn
         {
-            Date = i.Date, CustomerId = i.CustomerId, WarehouseId = i.WarehouseId, CurrencyId = i.CurrencyId, ExchangeRate = rate,
+            Date = i.Date, CustomerId = i.CustomerId, WarehouseId = i.WarehouseId, SalesInvoiceId = i.SalesInvoiceId, CurrencyId = i.CurrencyId, ExchangeRate = rate,
             Notes = Clean(i.Notes), Status = DocumentStatus.Draft, Lines = ReturnLines(i.Lines),
             TotalAmount = i.Lines.Sum(l => R4(l.Quantity * l.UnitPrice)),
         };
@@ -532,12 +572,10 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var r = await LoadReturnAsync(id, ct);
         EnsureDraft(r.Status);
-        await EnsureCustomerAsync(i.CustomerId, ct);
-        await db.EnsureWarehouseAsync(i.WarehouseId, ct);
-        await db.EnsureItemsAsync(i.Lines.Select(l => l.ItemId), ct);
+        await ValidateReturnAsync(i, id, ct);
         var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, r.CurrencyId == i.CurrencyId ? r.ExchangeRate : null, ct);
 
-        r.Date = i.Date; r.CustomerId = i.CustomerId; r.WarehouseId = i.WarehouseId; r.CurrencyId = i.CurrencyId;
+        r.Date = i.Date; r.CustomerId = i.CustomerId; r.WarehouseId = i.WarehouseId; r.SalesInvoiceId = i.SalesInvoiceId; r.CurrencyId = i.CurrencyId;
         r.ExchangeRate = rate; r.Notes = Clean(i.Notes);
         db.SalesReturnLines.RemoveRange(r.Lines);
         r.Lines = ReturnLines(i.Lines);
@@ -551,9 +589,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         var r = await LoadReturnAsync(id, ct);
         EnsureDraft(r.Status);
         r.Number = await numbers.NextAsync(SequenceKeys.SalesReturn, ct);
-        await EnsureCustomerAsync(r.CustomerId, ct);
-        await db.EnsureWarehouseAsync(r.WarehouseId, ct);
-        await db.EnsureItemsAsync(r.Lines.Select(l => l.ItemId), ct);
+        await ValidateReturnAsync(AsInput(r), r.Id, ct);
 
         var src = new PostingSource(r.Date, DocumentTypes.SalesReturn, r.Id, r.Number);
         var costBack = 0m;
@@ -601,11 +637,15 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     // =====================================================================
 
     /// <summary>Amount of a sales invoice already settled by CONFIRMED receipts (optionally ignoring one receipt).</summary>
-    private async Task<decimal> SettledAsync(int invoiceId, int? exceptReceiptId, CancellationToken ct) =>
-        await db.CustomerReceiptAllocations.AsNoTracking()
+    private async Task<decimal> SettledAsync(int invoiceId, int? exceptReceiptId, CancellationToken ct)
+    {
+        var paid = await db.CustomerReceiptAllocations.AsNoTracking()
             .Where(a => a.SalesInvoiceId == invoiceId && db.CustomerReceipts.Any(r =>
                 r.Id == a.CustomerReceiptId && r.Status == DocumentStatus.Confirmed && (exceptReceiptId == null || r.Id != exceptReceiptId)))
             .SumAsync(a => (decimal?)a.Amount, ct) ?? 0m;
+        // goods returned against the invoice reduce what is still owed on it
+        return paid + (await db.SalesReturns.AsNoTracking().Where(r => r.SalesInvoiceId == invoiceId && r.Status == DocumentStatus.Confirmed).SumAsync(r => (decimal?)r.TotalAmount, ct) ?? 0m);
+    }
 
     private async Task ValidateAllocationsAsync(int customerId, int currencyId, decimal amount, List<AllocationInput>? allocations, int? receiptId, CancellationToken ct)
     {
@@ -870,6 +910,12 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         if (t.Status != TripStatus.InTransit) throw new BusinessRuleException("Only a trip in transit can be completed.");
         if (t.Stops.Any(s => s.Status == StopStatus.Pending))
             throw new BusinessRuleException("Mark every stop as delivered or failed before completing the trip.");
+        // A failed stop means the goods never left the truck: take the delivery back into stock, atomically with completing the trip.
+        foreach (var stop in t.Stops.Where(s => s.Status == StopStatus.Failed))
+        {
+            var d = await LoadDeliveryAsync(stop.DeliveryNoteId, ct);
+            if (d.Status != DocumentStatus.Cancelled) await CancelDeliveryCoreAsync(d, false, ct);
+        }
         t.Status = TripStatus.Completed;
         t.CompletedAt = DateTime.UtcNow;
         await SaveAsync(ct);
@@ -960,6 +1006,8 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         var settled = (await db.CustomerReceiptAllocations.AsNoTracking()
             .Where(a => db.CustomerReceipts.Any(r => r.Id == a.CustomerReceiptId && r.Status == DocumentStatus.Confirmed)).ToListAsync(ct))
             .GroupBy(a => a.SalesInvoiceId).ToDictionary(g => g.Key, g => g.Sum(a => a.Amount));
+        foreach (var g in (await db.SalesReturns.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed && r.SalesInvoiceId != null).ToListAsync(ct)).GroupBy(r => r.SalesInvoiceId!.Value))
+            settled[g.Key] = settled.GetValueOrDefault(g.Key) + g.Sum(r => r.TotalAmount);
 
         return invoices.Select(i =>
             {

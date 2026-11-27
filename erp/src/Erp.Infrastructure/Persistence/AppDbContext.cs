@@ -39,6 +39,8 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
     public DbSet<GoodsReceipt> GoodsReceipts => Set<GoodsReceipt>();
     public DbSet<GoodsReceiptLine> GoodsReceiptLines => Set<GoodsReceiptLine>();
     public DbSet<PurchaseInvoice> PurchaseInvoices => Set<PurchaseInvoice>();
+    public DbSet<PurchaseReturn> PurchaseReturns => Set<PurchaseReturn>();
+    public DbSet<PurchaseReturnLine> PurchaseReturnLines => Set<PurchaseReturnLine>();
     public DbSet<PurchaseInvoiceLine> PurchaseInvoiceLines => Set<PurchaseInvoiceLine>();
     public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
 
@@ -383,6 +385,7 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
             e.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<SalesInvoice>().WithMany().HasForeignKey(x => x.SalesInvoiceId).OnDelete(DeleteBehavior.Restrict);
             e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.SalesReturnId).OnDelete(DeleteBehavior.Cascade);
             e.ToTable(t => t.HasCheckConstraint("CK_SalesReturn_Rate", "[ExchangeRate] > 0"));
         });
@@ -496,6 +499,27 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
             e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<PurchaseOrderLine>().WithMany().HasForeignKey(x => x.PurchaseOrderLineId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable(t => t.HasCheckConstraint("CK_PurchaseInvoiceLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0"));
+        });
+
+        b.Entity<PurchaseReturn>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.SupplierId, x.Date });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Supplier>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Warehouse>().WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<PurchaseInvoice>().WithMany().HasForeignKey(x => x.PurchaseInvoiceId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.PurchaseReturnId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_PurchaseReturn_Rate", "[ExchangeRate] > 0"));
+        });
+
+        b.Entity<PurchaseReturnLine>(e =>
+        {
+            e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_PurchaseReturnLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0"));
         });
 
         b.Entity<SupplierPayment>(e =>

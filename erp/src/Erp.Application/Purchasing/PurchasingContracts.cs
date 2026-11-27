@@ -24,6 +24,11 @@ public sealed record PurchaseInvoiceInput(DateOnly Date, DateOnly? DueDate, int 
 public sealed record SupplierPaymentInput(DateOnly Date, int SupplierId, int CurrencyId, decimal? ExchangeRate, decimal Amount,
     PaymentMethod Method, string? Reference, string? Notes, List<AllocationInput>? Allocations = null);
 
+public sealed record PurchaseReturnLineInput(int ItemId, decimal Quantity, decimal UnitPrice);
+
+public sealed record PurchaseReturnInput(DateOnly Date, int SupplierId, int WarehouseId, int? PurchaseInvoiceId, int CurrencyId, decimal? ExchangeRate,
+    string? Notes, List<PurchaseReturnLineInput> Lines);
+
 // ---------- filters ----------
 /// <param name="PendingOnly">Orders: only confirmed orders that still have quantity to receive.</param>
 public sealed record PurchasingFilter(DocumentStatus? Status, int? SupplierId, string? Q, bool PendingOnly = false, int Page = 1, int PageSize = 20);
@@ -38,6 +43,9 @@ public sealed record GoodsReceiptRow(int Id, string? Number, DateOnly Date, int 
 public sealed record PurchaseInvoiceRow(int Id, string? Number, DateOnly Date, DateOnly? DueDate, int SupplierId, string? SupplierInvoiceNumber,
     int? PurchaseOrderId, int CurrencyId, DocumentStatus Status, decimal TotalAmount);
 
+public sealed record PurchaseReturnRow(int Id, string? Number, DateOnly Date, int SupplierId, int WarehouseId, int? PurchaseInvoiceId, int CurrencyId,
+    DocumentStatus Status, decimal TotalAmount, int LineCount);
+
 public sealed record StatementRow(DateOnly Date, string Type, string? Number, string? Reference, int CurrencyId, decimal Amount, decimal ExchangeRate,
     decimal Debit, decimal Credit, decimal Balance);
 
@@ -45,7 +53,7 @@ public sealed record StatementRow(DateOnly Date, string Type, string? Number, st
 public sealed record SupplierStatement(int SupplierId, DateOnly? From, DateOnly? To, decimal OpeningBalance, IReadOnlyList<StatementRow> Rows,
     decimal TotalInvoiced, decimal TotalPaid, decimal ClosingBalance);
 
-public sealed record SupplierBalanceRow(int SupplierId, string Code, string NameAr, string NameEn, decimal Invoiced, decimal Paid, decimal Balance);
+public sealed record SupplierBalanceRow(int SupplierId, string Code, string NameAr, string NameEn, decimal Invoiced, decimal Returned, decimal Paid, decimal Balance);
 
 /// <summary>Purchasing use cases. Confirm/cancel are atomic (document, stock and order progress commit together).</summary>
 public interface IPurchasingService
@@ -73,6 +81,14 @@ public interface IPurchasingService
     Task<PurchaseInvoice> UpdateInvoiceAsync(int id, PurchaseInvoiceInput input, CancellationToken ct);
     Task<PurchaseInvoice> ConfirmInvoiceAsync(int id, CancellationToken ct);
     Task<PurchaseInvoice> CancelInvoiceAsync(int id, CancellationToken ct);
+
+    // purchase returns
+    Task<PagedResult<PurchaseReturnRow>> ListReturnsAsync(PurchasingFilter f, CancellationToken ct);
+    Task<PurchaseReturn> GetReturnAsync(int id, CancellationToken ct);
+    Task<PurchaseReturn> CreateReturnAsync(PurchaseReturnInput input, CancellationToken ct);
+    Task<PurchaseReturn> UpdateReturnAsync(int id, PurchaseReturnInput input, CancellationToken ct);
+    Task<PurchaseReturn> ConfirmReturnAsync(int id, CancellationToken ct);
+    Task<PurchaseReturn> CancelReturnAsync(int id, CancellationToken ct);
 
     // supplier payments
     Task<PagedResult<SupplierPayment>> ListPaymentsAsync(PurchasingFilter f, CancellationToken ct);

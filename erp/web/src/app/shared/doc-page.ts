@@ -152,6 +152,21 @@ export class DocPage implements OnInit {
     return false;
   }
 
+  /** Key of the per-line link to an order line; absent for documents that only reference a header (returns). */
+  private get lineKey(): string | undefined {
+    return this.cfg.order?.lineKey;
+  }
+
+  /** Lines come from a linked order and cannot be added or re-targeted. */
+  linesLocked(d: Doc): boolean {
+    return !!this.lineKey && !!this.orderId(d);
+  }
+
+  lineLinked(l: Record<string, any>): boolean {
+    const k = this.lineKey;
+    return !!k && !!l[k];
+  }
+
   private orderId(d: Doc): number | null {
     return this.cfg.order ? (d[this.cfg.order.idKey] ?? null) : null;
   }
@@ -227,7 +242,7 @@ export class DocPage implements OnInit {
         d['currencyId'] = order['currencyId'];
         d['exchangeRate'] = order['exchangeRate'];
         const lines = order.lines
-          .map((l) => ({ [link.lineKey]: l['id'], itemId: l['itemId'], quantity: link.remaining(l), unitPrice: l['unitPrice'] }))
+          .map((l) => ({ ...(link.lineKey ? { [link.lineKey]: l['id'] } : {}), itemId: l['itemId'], quantity: link.remaining(l), unitPrice: l['unitPrice'] }))
           .filter((l) => (l['quantity'] as number) > 0);
         d.lines = lines;
         this.message.set(lines.length ? '' : this.i18n.t('pur.nothingLeft'));
@@ -238,14 +253,15 @@ export class DocPage implements OnInit {
   }
 
   private unlinkOrder(d: Doc): void {
-    for (const l of d.lines ?? []) l[this.cfg.order!.lineKey] = null;
+    const k = this.lineKey;
+    if (k) for (const l of d.lines ?? []) l[k] = null;
   }
 
   // ---------- editor ----------
   private blankLine(): Record<string, any> {
     if (this.cfg.lineKind === 'expense') return { accountId: 0, description: null, amount: null };
-    return this.cfg.order
-      ? { [this.cfg.order.lineKey]: null, itemId: 0, quantity: null, unitPrice: null }
+    return this.lineKey
+      ? { [this.lineKey]: null, itemId: 0, quantity: null, unitPrice: null }
       : { itemId: 0, quantity: null, unitPrice: null };
   }
 
@@ -327,7 +343,7 @@ export class DocPage implements OnInit {
     if (this.cfg.lineCols && this.cfg.lineKind === 'expense') {
       b['lines'] = (d.lines ?? []).map((l) => ({ accountId: l['accountId'], description: (l['description'] as string | null)?.trim() || null, amount: Number(l['amount'] ?? 0) }));
     } else if (this.cfg.lineCols) {
-      const lineKey = this.cfg.order?.lineKey;
+      const lineKey = this.lineKey;
       b['lines'] = (d.lines ?? []).map((l) => ({
         ...(lineKey ? { [lineKey]: l[lineKey] ?? null } : {}),
         itemId: l['itemId'],

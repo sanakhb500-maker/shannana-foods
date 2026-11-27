@@ -50,6 +50,7 @@ export const routes: Routes = [
       doc('purchase-orders', 'order', [purchasingGuard]),
       doc('goods-receipts', 'receipt', [purchasingGuard]),
       doc('purchase-invoices', 'invoice', [purchasingGuard]),
+      doc('purchase-returns', 'purchaseReturn', [purchasingGuard]),
       doc('supplier-payments', 'payment', [purchasingGuard]),
       doc('expense-invoices', 'expenseInvoice', [purchasingGuard]),
       { path: 'supplier-ageing', loadComponent: () => import('./pages/ageing-page').then((m) => m.AgeingPage), data: { side: 'supplier' }, canActivate: [purchasingGuard] },

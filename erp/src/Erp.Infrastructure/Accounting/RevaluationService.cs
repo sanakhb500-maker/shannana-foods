@@ -23,6 +23,8 @@ public class RevaluationService(AppDbContext db, JournalPoster gl) : IRevaluatio
         var receiptAllocs = (await db.CustomerReceiptAllocations.AsNoTracking()
             .Where(a => db.CustomerReceipts.Any(r => r.Id == a.CustomerReceiptId && r.Status == DocumentStatus.Confirmed && r.Date <= asOf)).ToListAsync(ct))
             .GroupBy(a => a.SalesInvoiceId).ToDictionary(g => g.Key, g => g.Sum(a => a.Amount));
+        foreach (var g in (await db.SalesReturns.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed && r.Date <= asOf && r.SalesInvoiceId != null).ToListAsync(ct)).GroupBy(r => r.SalesInvoiceId!.Value))
+            receiptAllocs[g.Key] = receiptAllocs.GetValueOrDefault(g.Key) + g.Sum(r => r.TotalAmount);
         items.AddRange(sales.Select(i => new OpenItem(InvoiceKind.Sales, i.Id, i.Number, true, i.CurrencyId, i.ExchangeRate, i.TotalAmount, receiptAllocs.GetValueOrDefault(i.Id))));
 
         var payAllocs = await db.SupplierPaymentAllocations.AsNoTracking()
@@ -30,6 +32,8 @@ public class RevaluationService(AppDbContext db, JournalPoster gl) : IRevaluatio
         var purchase = await db.PurchaseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed && i.Date <= asOf && i.CurrencyId != localId)
             .Select(i => new { i.Id, i.Number, i.CurrencyId, i.ExchangeRate, i.TotalAmount }).ToListAsync(ct);
         var byPurchase = payAllocs.Where(a => a.PurchaseInvoiceId != null).GroupBy(a => a.PurchaseInvoiceId!.Value).ToDictionary(g => g.Key, g => g.Sum(a => a.Amount));
+        foreach (var g in (await db.PurchaseReturns.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed && r.Date <= asOf && r.PurchaseInvoiceId != null).ToListAsync(ct)).GroupBy(r => r.PurchaseInvoiceId!.Value))
+            byPurchase[g.Key] = byPurchase.GetValueOrDefault(g.Key) + g.Sum(r => r.TotalAmount);
         items.AddRange(purchase.Select(i => new OpenItem(InvoiceKind.Purchase, i.Id, i.Number, false, i.CurrencyId, i.ExchangeRate, i.TotalAmount, byPurchase.GetValueOrDefault(i.Id))));
 
         var expense = await db.ExpenseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed && i.Date <= asOf && i.CurrencyId != localId)

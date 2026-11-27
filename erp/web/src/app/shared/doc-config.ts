@@ -1,7 +1,7 @@
 import { WRITE_ROLES } from '../core/models';
 
 export type DocKind =
-  | 'order' | 'receipt' | 'invoice' | 'payment'
+  | 'order' | 'receipt' | 'invoice' | 'payment' | 'purchaseReturn'
   | 'salesOrder' | 'delivery' | 'salesInvoice' | 'salesReturn' | 'customerReceipt'
   | 'expenseInvoice' | 'expenseVoucher';
 
@@ -39,9 +39,10 @@ export interface ListCol {
 
 /** How a receipt/invoice/delivery links back to the order it fulfils. */
 export interface OrderLinkConfig {
-  endpoint: 'purchaseorders' | 'salesorders';
-  idKey: 'purchaseOrderId' | 'salesOrderId';
-  lineKey: 'purchaseOrderLineId' | 'salesOrderLineId';
+  endpoint: 'purchaseorders' | 'salesorders' | 'purchaseinvoices' | 'salesinvoices';
+  idKey: 'purchaseOrderId' | 'salesOrderId' | 'purchaseInvoiceId' | 'salesInvoiceId';
+  /** Absent when the link is only a reference (returns): the lines are then free to edit and carry no per-line link. */
+  lineKey?: 'purchaseOrderLineId' | 'salesOrderLineId';
   /** Quantity still to process on an order line, for pre-filling a new document from the order. */
   remaining: (orderLine: Record<string, any>) => number;
 }
@@ -99,6 +100,11 @@ const salesLink: OrderLinkConfig = {
   endpoint: 'salesorders', idKey: 'salesOrderId', lineKey: 'salesOrderLineId', remaining: () => 0,
 };
 
+const purchaseInvoiceLink: OrderLinkConfig = { endpoint: 'purchaseinvoices', idKey: 'purchaseInvoiceId', remaining: (l) => l['quantity'] };
+const salesInvoiceLink: OrderLinkConfig = { endpoint: 'salesinvoices', idKey: 'salesInvoiceId', remaining: (l) => l['quantity'] };
+const purchaseInvoiceField: DocField = { key: 'purchaseInvoiceId', label: 'pur.linkedInvoice', type: 'select', options: 'orders', nullable: true };
+const salesInvoiceField: DocField = { key: 'salesInvoiceId', label: 'sal.linkedInvoice', type: 'select', options: 'orders', nullable: true };
+
 const itemQtyPrice: LineCol[] = [
   { key: 'itemId', label: 'f.item', kind: 'item' },
   { key: 'quantity', label: 'inv.quantity', kind: 'qty' },
@@ -149,6 +155,7 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
   invoice: {
     kind: 'invoice', title: 'nav.purchaseInvoices', newLabel: 'pur.newInvoice', endpoint: 'purchaseinvoices', writeRoles: WRITE_ROLES.purchasing,
     partyKey: 'supplierId', filters: ['party'], hint: 'pur.varianceHint',
+    shortcuts: [{ label: 'pur.createReturn', route: '/purchase-returns', roles: WRITE_ROLES.purchasing }],
     order: { ...purchaseLink, remaining: (l) => l['receivedQuantity'] - l['invoicedQuantity'] },
     fields: [
       date, { key: 'dueDate', label: 'pur.dueDate', type: 'date' }, purchaseOrder, supplier,
@@ -162,6 +169,21 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
       { key: 'date', label: 'f.date', kind: 'date' }, { key: 'dueDate', label: 'pur.dueDate', kind: 'date' },
       { key: 'supplierId', label: 'f.supplier', kind: 'supplier' }, { key: 'totalAmount', label: 'pur.total', kind: 'amount' },
       { key: 'currencyId', label: 'f.currency', kind: 'currency' }, { key: 'status', label: 'common.status', kind: 'status' },
+    ],
+  },
+  purchaseReturn: {
+    kind: 'purchaseReturn', title: 'nav.purchaseReturns', newLabel: 'pur.newReturn', endpoint: 'purchasereturns', writeRoles: WRITE_ROLES.purchasing,
+    partyKey: 'supplierId', filters: ['party'], order: purchaseInvoiceLink,
+    fields: [date, purchaseInvoiceField, supplier, { key: 'warehouseId', label: 'f.warehouse', type: 'select', options: 'warehouses', required: true }, currency, rate,
+      { key: 'notes', label: 'sal.returnReason', type: 'text', maxlength: 500 }],
+    lineCols: itemQtyPrice,
+    blankExtras: () => ({ warehouseId: null, purchaseInvoiceId: null }),
+    bodyExtras: (d) => ({ warehouseId: d['warehouseId'] ?? 0, purchaseInvoiceId: d['purchaseInvoiceId'] ?? null }),
+    listCols: [
+      { key: 'number', label: 'inv.number', kind: 'text' }, { key: 'date', label: 'f.date', kind: 'date' },
+      { key: 'supplierId', label: 'f.supplier', kind: 'supplier' }, { key: 'warehouseId', label: 'f.warehouse', kind: 'warehouse' },
+      { key: 'totalAmount', label: 'pur.total', kind: 'amount' }, { key: 'currencyId', label: 'f.currency', kind: 'currency' },
+      { key: 'status', label: 'common.status', kind: 'status' },
     ],
   },
   payment: {
@@ -223,6 +245,7 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
   salesInvoice: {
     kind: 'salesInvoice', title: 'nav.salesInvoices', newLabel: 'sal.newInvoice', endpoint: 'salesinvoices', writeRoles: WRITE_ROLES.sales,
     partyKey: 'customerId', filters: ['party'], priceFromItem: true,
+    shortcuts: [{ label: 'sal.createReturn', route: '/sales-returns', roles: WRITE_ROLES.deliveries }],
     order: { ...salesLink, remaining: (l) => l['deliveredQuantity'] - l['invoicedQuantity'] },
     fields: [date, { key: 'dueDate', label: 'pur.dueDate', type: 'date' }, salesOrder, customer, currency, rate, notes],
     lineCols: itemQtyPrice,
@@ -236,12 +259,12 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
   },
   salesReturn: {
     kind: 'salesReturn', title: 'nav.salesReturns', newLabel: 'sal.newReturn', endpoint: 'salesreturns', writeRoles: WRITE_ROLES.deliveries,
-    partyKey: 'customerId', filters: ['party'], priceFromItem: true,
-    fields: [date, customer, { key: 'warehouseId', label: 'f.warehouse', type: 'select', options: 'warehouses', required: true }, currency, rate,
+    partyKey: 'customerId', filters: ['party'], priceFromItem: true, order: salesInvoiceLink,
+    fields: [date, salesInvoiceField, customer, { key: 'warehouseId', label: 'f.warehouse', type: 'select', options: 'warehouses', required: true }, currency, rate,
       { key: 'notes', label: 'sal.returnReason', type: 'text', maxlength: 500 }],
     lineCols: itemQtyPrice,
-    blankExtras: () => ({ warehouseId: null }),
-    bodyExtras: (d) => ({ warehouseId: d['warehouseId'] ?? 0 }),
+    blankExtras: () => ({ warehouseId: null, salesInvoiceId: null }),
+    bodyExtras: (d) => ({ warehouseId: d['warehouseId'] ?? 0, salesInvoiceId: d['salesInvoiceId'] ?? null }),
     listCols: [
       { key: 'number', label: 'inv.number', kind: 'text' }, { key: 'date', label: 'f.date', kind: 'date' },
       { key: 'customerId', label: 'f.customer', kind: 'customer' }, { key: 'warehouseId', label: 'f.warehouse', kind: 'warehouse' },

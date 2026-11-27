@@ -100,6 +100,7 @@ public static class SourceTypes
     public const string DeliveryNote = "DeliveryNote";
     public const string SalesInvoice = "SalesInvoice";
     public const string SalesReturn = "SalesReturn";
+    public const string PurchaseReturn = "PurchaseReturn";
     public const string CustomerReceipt = "CustomerReceipt";
     public const string StockAdjustment = "StockAdjustment";
     public const string ExpenseInvoice = "ExpenseInvoice";

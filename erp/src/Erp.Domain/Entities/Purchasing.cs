@@ -119,3 +119,34 @@ public class SupplierPayment : AuditableEntity
     public decimal? LocalSettled { get; set; }
     public List<SupplierPaymentAllocation> Allocations { get; set; } = [];
 }
+
+/// <summary>Goods sent back to a supplier. Confirming takes stock out and reduces what we owe (Dr Payables, Cr Inventory; any price/cost difference goes to GRNI).</summary>
+public class PurchaseReturn : AuditableEntity
+{
+    public string? Number { get; set; }
+    public DateOnly Date { get; set; }
+    public int SupplierId { get; set; }
+    public int WarehouseId { get; set; }
+    /// <summary>Optional: the invoice these goods were bought on. A linked return cannot exceed what was invoiced and reduces that invoice's outstanding amount.</summary>
+    public int? PurchaseInvoiceId { get; set; }
+    public int CurrencyId { get; set; }
+    public decimal ExchangeRate { get; set; } = 1m;
+    public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
+    public string? Notes { get; set; }
+    public decimal TotalAmount { get; set; }
+    public DateTime? ConfirmedAt { get; set; }
+    public string? ConfirmedBy { get; set; }
+    public List<PurchaseReturnLine> Lines { get; set; } = [];
+}
+
+public class PurchaseReturnLine
+{
+    public int Id { get; set; }
+    public int PurchaseReturnId { get; set; }
+    public int ItemId { get; set; }
+    public decimal Quantity { get; set; }
+    /// <summary>Credit price per unit, document currency.</summary>
+    public decimal UnitPrice { get; set; }
+    /// <summary>Local-currency average cost the stock left at; filled on confirm.</summary>
+    public decimal? UnitCost { get; set; }
+}

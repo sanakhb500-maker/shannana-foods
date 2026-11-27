@@ -295,6 +295,7 @@ public class AccountingService(AppDbContext db, ICurrentUser user, JournalPoster
 
         var supInvoiced = await db.PurchaseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed).SumAsync(i => (decimal?)Math.Round(i.TotalAmount * i.ExchangeRate, 4), ct) ?? 0m;
         var supExpenses = await db.ExpenseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed).SumAsync(i => (decimal?)Math.Round(i.TotalAmount * i.ExchangeRate, 4), ct) ?? 0m;
+        var supReturns = await db.PurchaseReturns.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed).SumAsync(r => (decimal?)Math.Round(r.TotalAmount * r.ExchangeRate, 4), ct) ?? 0m;
         var supPaid = await db.SupplierPayments.AsNoTracking().Where(p => p.Status == DocumentStatus.Confirmed).SumAsync(p => (decimal?)(p.LocalSettled ?? Math.Round(p.Amount * p.ExchangeRate, 4)), ct) ?? 0m;
 
         var cusInvoiced = await db.SalesInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed).SumAsync(i => (decimal?)Math.Round(i.TotalAmount * i.ExchangeRate, 4), ct) ?? 0m;
@@ -305,7 +306,7 @@ public class AccountingService(AppDbContext db, ICurrentUser user, JournalPoster
         return
         [
             Row("Inventory", glInventory, stock),
-            Row("Payables", glPayables, supInvoiced + supExpenses - supPaid),
+            Row("Payables", glPayables, supInvoiced + supExpenses - supReturns - supPaid),
             Row("Receivables", glReceivables, cusInvoiced - cusReturned - cusReceived),
         ];
     }

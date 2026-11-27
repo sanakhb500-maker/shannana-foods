@@ -22,6 +22,7 @@ import { SupplierBalanceRow, SupplierStatement } from '../core/models';
           <tr>
             <th>{{ i18n.t('f.supplier') }}</th>
             <th class="num">{{ i18n.t('pur.invoicedTotal') }}</th>
+            <th class="num">{{ i18n.t('pur.returnedTotal') }}</th>
             <th class="num">{{ i18n.t('pur.paidTotal') }}</th>
             <th class="num">{{ i18n.t('pur.balanceOwed') }}</th>
           </tr>
@@ -31,11 +32,12 @@ import { SupplierBalanceRow, SupplierStatement } from '../core/models';
             <tr class="clickable" (click)="open(r.supplierId)">
               <td>{{ r.code }} — {{ i18n.lang() === 'ar' ? r.nameAr || r.nameEn : r.nameEn || r.nameAr }}</td>
               <td class="num">{{ r.invoiced | number: '1.2-2' }}</td>
+              <td class="num">{{ r.returned | number: '1.2-2' }}</td>
               <td class="num">{{ r.paid | number: '1.2-2' }}</td>
               <td class="num" [class.neg]="r.balance > 0">{{ r.balance | number: '1.2-2' }}</td>
             </tr>
           } @empty {
-            <tr><td class="empty" colspan="4">{{ i18n.t(loading() ? 'common.loading' : 'common.empty') }}</td></tr>
+            <tr><td class="empty" colspan="5">{{ i18n.t(loading() ? 'common.loading' : 'common.empty') }}</td></tr>
           }
         </tbody>
         @if (rows().length) {
@@ -43,6 +45,7 @@ import { SupplierBalanceRow, SupplierStatement } from '../core/models';
             <tr>
               <th>{{ i18n.t('common.total') }}</th>
               <th class="num">{{ sum('invoiced') | number: '1.2-2' }}</th>
+              <th class="num">{{ sum('returned') | number: '1.2-2' }}</th>
               <th class="num">{{ sum('paid') | number: '1.2-2' }}</th>
               <th class="num">{{ sum('balance') | number: '1.2-2' }}</th>
             </tr>
@@ -73,7 +76,7 @@ export class SupplierBalancesPage implements OnInit {
     });
   }
 
-  sum(k: 'invoiced' | 'paid' | 'balance'): number {
+  sum(k: 'invoiced' | 'returned' | 'paid' | 'balance'): number {
     return this.rows().reduce((s, r) => s + r[k], 0);
   }
 

@@ -175,7 +175,7 @@
                     @switch (c.kind) {
                       @case ('item') {
                         <td>
-                          <select class="input" [name]="'item' + i" [(ngModel)]="l['itemId']" (ngModelChange)="itemChanged(l)" [disabled]="!editable() || !!(cfg.order && l[cfg.order.lineKey])">
+                          <select class="input" [name]="'item' + i" [(ngModel)]="l['itemId']" (ngModelChange)="itemChanged(l)" [disabled]="!editable() || lineLinked(l)">
                             <option [ngValue]="0" disabled>{{ i18n.t('common.select') }}</option>
                             @for (it of itemChoices(l['itemId']); track it.id) {
                               <option [ngValue]="it.id">{{ lookups.itemLabel(it.id) }}</option>
@@ -220,7 +220,7 @@
             </tfoot>
           </table>
         </div>
-        @if (editable() && !(cfg.order && d[cfg.order.idKey])) {
+        @if (editable() && !linesLocked(d)) {
           <button class="btn sm" type="button" (click)="addLine()">+ {{ i18n.t('inv.addLine') }}</button>
         }
       }

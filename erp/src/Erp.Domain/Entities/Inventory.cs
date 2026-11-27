@@ -17,6 +17,7 @@ public enum MovementType
     PurchaseReceipt = 10,
     SalesDelivery = 11,
     SalesReturn = 12,
+    PurchaseReturn = 13,
 }
 
 /// <summary>Document-type keys stored on movements (kept as text so later phases can add their own).</summary>
@@ -27,6 +28,7 @@ public static class DocumentTypes
     public const string GoodsReceipt = "GoodsReceipt";
     public const string Delivery = "DeliveryNote";
     public const string SalesReturn = "SalesReturn";
+    public const string PurchaseReturn = "PurchaseReturn";
 }
 
 /// <summary>Current quantity and moving-average cost of one item in one warehouse. Maintained together with <see cref="StockMovement"/>.</summary>
