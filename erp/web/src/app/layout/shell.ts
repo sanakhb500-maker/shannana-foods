@@ -16,7 +16,7 @@ interface NavItem {
   template: `
     <div class="shell" [class.nav-open]="navOpen()">
       <aside class="sidebar">
-        <div class="brand">{{ i18n.t('app.name') }}</div>
+        <div class="brand"><img src="shannana-logo.png" alt="" width="53" height="40" (error)="$any($event.target).remove()" />{{ i18n.t('app.name') }}</div>
         <nav>
           <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="navOpen.set(false)">{{ i18n.t('nav.dashboard') }}</a>
 

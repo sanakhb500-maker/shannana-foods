@@ -36,7 +36,7 @@ interface Hit { id: number; code?: string; nameAr?: string; nameEn?: string }
     .ss { position: relative; }
     .ss-clear { position: absolute; inset-inline-end: .4rem; top: 50%; transform: translateY(-50%); border: 0; background: none; cursor: pointer; color: var(--muted, #888); }
     .ss-list { position: absolute; z-index: 60; inset-inline: 0; margin: .15rem 0 0; padding: .2rem 0; list-style: none; max-height: 14rem; overflow-y: auto;
-      background: var(--surface, #fff); border: 1px solid var(--border, #ccc); border-radius: 8px; box-shadow: 0 6px 18px rgb(0 0 0 / 15%); }
+      background: var(--surface, #fff); border: 1px solid var(--border, #ccc); border-radius: var(--radius-sm, 14px); box-shadow: 0 12px 30px rgb(36 32 30 / 18%); }
     .ss-list li { padding: .4rem .7rem; cursor: pointer; }
     .ss-list li:hover, .ss-list li.sel { background: color-mix(in srgb, var(--primary, #7a1f2b) 10%, transparent); }
     .ss-list li.muted { cursor: default; color: var(--muted, #888); }

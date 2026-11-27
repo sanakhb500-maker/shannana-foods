@@ -136,6 +136,9 @@ Roles: Admin, Accountant, StoreKeeper, Purchasing, Sales, Dispatcher. Everyone s
 ## Search selects (large lists)
 Item, supplier, customer and warehouse pickers (document headers and lines, transfers, adjustments, statements, stock filters) are **server-side search selects**: type a code or name and the API returns the best 20 matches, so lists with thousands of records work. Records fetched this way are added to the client cache so their labels display correctly; list pages fetch labels for any id outside the cached first 500. Master-data lists (currencies, units, drivers, vehicles, accounts) are still plain dropdowns because they stay small.
 
+## Look and feel
+The ERP follows the website's design (`frontend/css/style.css`): cream background, brand red `#a8202c`, olive `#718c3f`, Cairo, 20px cards, pill buttons, a dark ink sidebar with the logo. All colors, radii and shadows are CSS variables at the top of `web/src/styles.scss` (light and dark sets), so a palette change is made in one place.
+
 ## Tests
 ```powershell
 cd erp

@@ -10,6 +10,7 @@ import { I18n } from '../core/i18n';
   template: `
     <main class="login-wrap">
       <form class="card login" (ngSubmit)="submit()" novalidate>
+        <img class="login-logo" src="shannana-logo.png" alt="" (error)="$any($event.target).remove()" />
         <div class="login-top">
           <h1>{{ i18n.t('app.name') }}</h1>
           <button class="btn sm" type="button" (click)="i18n.toggle()">{{ i18n.lang() === 'ar' ? 'English' : 'العربية' }}</button>
