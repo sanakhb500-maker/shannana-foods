@@ -52,6 +52,7 @@ export const WRITE_ROLES = {
   customerReceipts: ['Admin', 'Accountant'],
   viewSales: ['Admin', 'Accountant', 'Sales', 'Dispatcher', 'StoreKeeper'],
   accounting: ['Admin', 'Accountant'],
+  expenseInvoices: ['Admin', 'Accountant', 'Purchasing'],
 } as const satisfies Record<string, readonly string[]>;
 
 // ---------- inventory ----------
@@ -132,3 +133,10 @@ export interface BalanceSheet { assets: StatementLine[]; totalAssets: number; li
 export interface ReconciliationRow { key: string; generalLedger: number; subLedger: number; difference: number; reconciled: boolean }
 export interface MonthlyFigure { month: string; revenue: number; costOfGoodsSold: number; grossProfit: number }
 export interface AccountingSummary { cashAndBank: number; receivables: number; payables: number; inventoryValue: number; monthRevenue: number; monthCostOfGoodsSold: number; monthGrossProfit: number; months: MonthlyFigure[]; lockDate: string | null }
+
+// ---------- settlement, ageing, revaluation ----------
+export interface OpenInvoice { kind: 'PurchaseInvoice' | 'ExpenseInvoice' | 'SalesInvoice'; invoiceId: number; number: string | null; date: string; dueDate: string | null; currencyId: number; exchangeRate: number; total: number; settled: number; outstanding: number; outstandingLocal: number; daysOverdue: number; bucket: string }
+export interface AgeingRow { partyId: number; code: string; nameAr: string; nameEn: string; current: number; days1To30: number; days31To60: number; days61To90: number; over90: number; total: number }
+export interface RevaluationLine { kind: string; invoiceId: number; number: string | null; isReceivable: boolean; currencyId: number; outstanding: number; bookedRate: number; closingRate: number; difference: number }
+export interface RevaluationPreview { asOf: string; lines: RevaluationLine[]; receivablesDifference: number; payablesDifference: number; netResult: number }
+export interface RevaluationRun { id: number; asOf: string; netResult: number; entryNumber: string | null; reversalNumber: string | null; createdAt: string; createdBy: string | null }

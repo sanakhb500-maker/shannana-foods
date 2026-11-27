@@ -273,37 +273,39 @@ public class AccountingService(AppDbContext db, ICurrentUser user, JournalPoster
         return new BalanceSheet(asOf, assets, totalAssets, liabilities, totalLiabilities, equity, earnings, totalEquity, totalAssets == totalLiabilities + totalEquity);
     }
 
-    private async Task<decimal> RoleNetDebitAsync(string role, CancellationToken ct)
+    private async Task<decimal> RoleNetDebitAsync(string role, CancellationToken ct, bool excludeRevaluation = false)
     {
         var id = await db.Accounts.AsNoTracking().Where(a => a.SystemRole == role).Select(a => (int?)a.Id).FirstOrDefaultAsync(ct);
         if (id is null) return 0m;
         return await db.JournalLines.AsNoTracking()
-            .Where(l => db.JournalEntries.Any(e => e.Id == l.JournalEntryId && e.Status != JournalStatus.Draft) && l.AccountId == id)
+            .Where(l => db.JournalEntries.Any(e => e.Id == l.JournalEntryId && e.Status != JournalStatus.Draft && (!excludeRevaluation || e.SourceType != SourceTypes.Revaluation)) && l.AccountId == id)
             .SumAsync(l => (decimal?)(l.Debit - l.Credit), ct) ?? 0m;
     }
 
     public async Task<IReadOnlyList<ReconciliationRow>> GetReconciliationAsync(CancellationToken ct)
     {
         // General ledger side
-        var glInventory = await RoleNetDebitAsync(AccountRoles.Inventory, ct);
-        var glReceivables = await RoleNetDebitAsync(AccountRoles.Receivables, ct);
-        var glPayables = -await RoleNetDebitAsync(AccountRoles.Payables, ct); // credit-normal: show as a positive amount owed
+        // Unrealised exchange differences (revaluation entries) are timing items, not sub-ledger differences: leave them out.
+        var glInventory = await RoleNetDebitAsync(AccountRoles.Inventory, ct, true);
+        var glReceivables = await RoleNetDebitAsync(AccountRoles.Receivables, ct, true);
+        var glPayables = -await RoleNetDebitAsync(AccountRoles.Payables, ct, true); // credit-normal: show as a positive amount owed
 
         // Sub-ledger side
         var stock = R4(await db.StockBalances.AsNoTracking().SumAsync(b => (decimal?)(b.Quantity * b.AverageCost), ct) ?? 0m);
 
         var supInvoiced = await db.PurchaseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed).SumAsync(i => (decimal?)Math.Round(i.TotalAmount * i.ExchangeRate, 4), ct) ?? 0m;
-        var supPaid = await db.SupplierPayments.AsNoTracking().Where(p => p.Status == DocumentStatus.Confirmed).SumAsync(p => (decimal?)Math.Round(p.Amount * p.ExchangeRate, 4), ct) ?? 0m;
+        var supExpenses = await db.ExpenseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed).SumAsync(i => (decimal?)Math.Round(i.TotalAmount * i.ExchangeRate, 4), ct) ?? 0m;
+        var supPaid = await db.SupplierPayments.AsNoTracking().Where(p => p.Status == DocumentStatus.Confirmed).SumAsync(p => (decimal?)(p.LocalSettled ?? Math.Round(p.Amount * p.ExchangeRate, 4)), ct) ?? 0m;
 
         var cusInvoiced = await db.SalesInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed).SumAsync(i => (decimal?)Math.Round(i.TotalAmount * i.ExchangeRate, 4), ct) ?? 0m;
         var cusReturned = await db.SalesReturns.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed).SumAsync(r => (decimal?)Math.Round(r.TotalAmount * r.ExchangeRate, 4), ct) ?? 0m;
-        var cusReceived = await db.CustomerReceipts.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed).SumAsync(r => (decimal?)Math.Round(r.Amount * r.ExchangeRate, 4), ct) ?? 0m;
+        var cusReceived = await db.CustomerReceipts.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed).SumAsync(r => (decimal?)(r.LocalSettled ?? Math.Round(r.Amount * r.ExchangeRate, 4)), ct) ?? 0m;
 
         static ReconciliationRow Row(string key, decimal gl, decimal sub) => new(key, gl, sub, gl - sub, Math.Abs(gl - sub) <= 0.01m);
         return
         [
             Row("Inventory", glInventory, stock),
-            Row("Payables", glPayables, supInvoiced - supPaid),
+            Row("Payables", glPayables, supInvoiced + supExpenses - supPaid),
             Row("Receivables", glReceivables, cusInvoiced - cusReturned - cusReceived),
         ];
     }

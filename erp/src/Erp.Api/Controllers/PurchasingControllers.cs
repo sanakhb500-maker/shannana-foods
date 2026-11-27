@@ -202,6 +202,13 @@ public class PurchasingReportsController(IPurchasingService svc) : ControllerBas
     public async Task<IActionResult> Statement([FromQuery] int supplierId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken ct) =>
         Ok(ApiResponse.Ok(await svc.GetStatementAsync(supplierId, from, to, ct)));
 
+    [HttpGet("open-invoices")]
+    public async Task<IActionResult> OpenInvoices([FromQuery] int? supplierId, CancellationToken ct) =>
+        Ok(ApiResponse.Ok(await svc.GetOpenInvoicesAsync(supplierId, ct)));
+
+    [HttpGet("ageing")]
+    public async Task<IActionResult> Ageing(CancellationToken ct) => Ok(ApiResponse.Ok(await svc.GetAgeingAsync(ct)));
+
     [HttpGet("supplier-balances")]
     public async Task<IActionResult> Balances(CancellationToken ct) => Ok(ApiResponse.Ok(await svc.GetSupplierBalancesAsync(ct)));
 }

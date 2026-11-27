@@ -282,6 +282,10 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<decimal?>("LocalSettled")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<int>("Method")
                         .HasColumnType("int");
 
@@ -319,6 +323,36 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.ToTable("CustomerReceipts", t =>
                         {
                             t.HasCheckConstraint("CK_CustomerReceipt_Amount", "[Amount] > 0 AND [ExchangeRate] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.CustomerReceiptAllocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("CustomerReceiptId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SalesInvoiceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerReceiptId");
+
+                    b.HasIndex("SalesInvoiceId");
+
+                    b.ToTable("CustomerReceiptAllocations", t =>
+                        {
+                            t.HasCheckConstraint("CK_CustomerReceiptAllocation_Amount", "[Amount] > 0");
                         });
                 });
 
@@ -616,6 +650,229 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.ToTable("ExchangeRates", t =>
                         {
                             t.HasCheckConstraint("CK_ExchangeRate_Rate", "[Rate] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseInvoice", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ConfirmedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CurrencyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Number")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SupplierId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SupplierInvoiceNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrencyId");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasFilter("[Number] IS NOT NULL");
+
+                    b.HasIndex("SupplierId", "Date");
+
+                    b.ToTable("ExpenseInvoices", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExpenseInvoice_Rate", "[ExchangeRate] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseInvoiceLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ExpenseInvoiceId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("ExpenseInvoiceId");
+
+                    b.ToTable("ExpenseInvoiceLines", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExpenseInvoiceLine_Amount", "[Amount] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseVoucher", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ConfirmedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CurrencyId")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Number")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Payee")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("TotalAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrencyId");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasFilter("[Number] IS NOT NULL");
+
+                    b.ToTable("ExpenseVouchers", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExpenseVoucher_Rate", "[ExchangeRate] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseVoucherLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ExpenseVoucherId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("ExpenseVoucherId");
+
+                    b.ToTable("ExpenseVoucherLines", t =>
+                        {
+                            t.HasCheckConstraint("CK_ExpenseVoucherLine_Amount", "[Amount] > 0");
                         });
                 });
 
@@ -1220,6 +1477,54 @@ namespace Erp.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_PurchaseOrderLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0");
                         });
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.RevaluationRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateOnly>("AsOf")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("JournalEntryId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("NetResult")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int?>("ReversalEntryId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AsOf")
+                        .IsUnique();
+
+                    b.HasIndex("JournalEntryId");
+
+                    b.HasIndex("ReversalEntryId");
+
+                    b.ToTable("RevaluationRuns");
                 });
 
             modelBuilder.Entity("Erp.Domain.Entities.SalesInvoice", b =>
@@ -1989,6 +2294,10 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<decimal?>("LocalSettled")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<int>("Method")
                         .HasColumnType("int");
 
@@ -2029,6 +2338,41 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.ToTable("SupplierPayments", t =>
                         {
                             t.HasCheckConstraint("CK_SupplierPayment_Amount", "[Amount] > 0 AND [ExchangeRate] > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.SupplierPaymentAllocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int?>("ExpenseInvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PurchaseInvoiceId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SupplierPaymentId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpenseInvoiceId");
+
+                    b.HasIndex("PurchaseInvoiceId");
+
+                    b.HasIndex("SupplierPaymentId");
+
+                    b.ToTable("SupplierPaymentAllocations", t =>
+                        {
+                            t.HasCheckConstraint("CK_SupplierPaymentAllocation_One", "[Amount] > 0 AND (([PurchaseInvoiceId] IS NOT NULL AND [ExpenseInvoiceId] IS NULL) OR ([PurchaseInvoiceId] IS NULL AND [ExpenseInvoiceId] IS NOT NULL))");
                         });
                 });
 
@@ -2447,6 +2791,21 @@ namespace Erp.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Erp.Domain.Entities.CustomerReceiptAllocation", b =>
+                {
+                    b.HasOne("Erp.Domain.Entities.CustomerReceipt", null)
+                        .WithMany("Allocations")
+                        .HasForeignKey("CustomerReceiptId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Erp.Domain.Entities.SalesInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("SalesInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Erp.Domain.Entities.DeliveryNote", b =>
                 {
                     b.HasOne("Erp.Domain.Entities.Currency", null)
@@ -2514,6 +2873,60 @@ namespace Erp.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("CurrencyId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseInvoice", b =>
+                {
+                    b.HasOne("Erp.Domain.Entities.Currency", null)
+                        .WithMany()
+                        .HasForeignKey("CurrencyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Erp.Domain.Entities.Supplier", null)
+                        .WithMany()
+                        .HasForeignKey("SupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseInvoiceLine", b =>
+                {
+                    b.HasOne("Erp.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Erp.Domain.Entities.ExpenseInvoice", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("ExpenseInvoiceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseVoucher", b =>
+                {
+                    b.HasOne("Erp.Domain.Entities.Currency", null)
+                        .WithMany()
+                        .HasForeignKey("CurrencyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseVoucherLine", b =>
+                {
+                    b.HasOne("Erp.Domain.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Erp.Domain.Entities.ExpenseVoucher", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("ExpenseVoucherId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
@@ -2668,6 +3081,23 @@ namespace Erp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("PurchaseOrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.RevaluationRun", b =>
+                {
+                    b.HasOne("Erp.Domain.Entities.JournalEntry", "JournalEntry")
+                        .WithMany()
+                        .HasForeignKey("JournalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Erp.Domain.Entities.JournalEntry", "ReversalEntry")
+                        .WithMany()
+                        .HasForeignKey("ReversalEntryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("JournalEntry");
+
+                    b.Navigation("ReversalEntry");
                 });
 
             modelBuilder.Entity("Erp.Domain.Entities.SalesInvoice", b =>
@@ -2888,6 +3318,25 @@ namespace Erp.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Erp.Domain.Entities.SupplierPaymentAllocation", b =>
+                {
+                    b.HasOne("Erp.Domain.Entities.ExpenseInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("ExpenseInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Erp.Domain.Entities.PurchaseInvoice", null)
+                        .WithMany()
+                        .HasForeignKey("PurchaseInvoiceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Erp.Domain.Entities.SupplierPayment", null)
+                        .WithMany("Allocations")
+                        .HasForeignKey("SupplierPaymentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Erp.Domain.Entities.TripStop", b =>
                 {
                     b.HasOne("Erp.Domain.Entities.DeliveryNote", null)
@@ -2954,6 +3403,11 @@ namespace Erp.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Erp.Domain.Entities.CustomerReceipt", b =>
+                {
+                    b.Navigation("Allocations");
+                });
+
             modelBuilder.Entity("Erp.Domain.Entities.DeliveryNote", b =>
                 {
                     b.Navigation("Lines");
@@ -2962,6 +3416,16 @@ namespace Erp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Erp.Domain.Entities.DistributionTrip", b =>
                 {
                     b.Navigation("Stops");
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseInvoice", b =>
+                {
+                    b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.ExpenseVoucher", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Erp.Domain.Entities.GoodsReceipt", b =>
@@ -3007,6 +3471,11 @@ namespace Erp.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Erp.Domain.Entities.StockTransfer", b =>
                 {
                     b.Navigation("Lines");
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.SupplierPayment", b =>
+                {
+                    b.Navigation("Allocations");
                 });
 #pragma warning restore 612, 618
         }

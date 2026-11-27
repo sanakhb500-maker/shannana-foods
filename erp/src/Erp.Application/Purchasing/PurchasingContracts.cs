@@ -1,4 +1,5 @@
 using Erp.Application.Common;
+using Erp.Application.Settlement;
 using Erp.Domain.Entities;
 
 namespace Erp.Application.Purchasing;
@@ -21,7 +22,7 @@ public sealed record PurchaseInvoiceInput(DateOnly Date, DateOnly? DueDate, int 
     int CurrencyId, decimal? ExchangeRate, string? Notes, List<InvoiceLineInput> Lines);
 
 public sealed record SupplierPaymentInput(DateOnly Date, int SupplierId, int CurrencyId, decimal? ExchangeRate, decimal Amount,
-    PaymentMethod Method, string? Reference, string? Notes);
+    PaymentMethod Method, string? Reference, string? Notes, List<AllocationInput>? Allocations = null);
 
 // ---------- filters ----------
 /// <param name="PendingOnly">Orders: only confirmed orders that still have quantity to receive.</param>
@@ -84,4 +85,6 @@ public interface IPurchasingService
     // reports
     Task<SupplierStatement> GetStatementAsync(int supplierId, DateOnly? from, DateOnly? to, CancellationToken ct);
     Task<IReadOnlyList<SupplierBalanceRow>> GetSupplierBalancesAsync(CancellationToken ct);
+    Task<IReadOnlyList<OpenInvoiceRow>> GetOpenInvoicesAsync(int? supplierId, CancellationToken ct);
+    Task<IReadOnlyList<AgeingRow>> GetAgeingAsync(CancellationToken ct);
 }

@@ -142,6 +142,9 @@ public class CustomerReceipt : AuditableEntity
     public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
     public DateTime? ConfirmedAt { get; set; }
     public string? ConfirmedBy { get; set; }
+    /// <summary>Local amount that cleared the receivable when confirmed (allocated part at the invoice rate, the rest at this receipt's rate).</summary>
+    public decimal? LocalSettled { get; set; }
+    public List<CustomerReceiptAllocation> Allocations { get; set; } = [];
 }
 
 /// <summary>One delivery run: a driver and vehicle visiting a list of customers (stops = delivery notes) in order.</summary>

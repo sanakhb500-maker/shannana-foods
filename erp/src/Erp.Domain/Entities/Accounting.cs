@@ -81,11 +81,13 @@ public static class AccountRoles
     public const string SalesReturns = "SalesReturns";
     public const string CostOfGoodsSold = "COGS";
     public const string InventoryAdjustments = "InventoryAdjustments";
+    public const string ExchangeGain = "ExchangeGain";
+    public const string ExchangeLoss = "ExchangeLoss";
 
     public static readonly string[] All =
     [
         Cash, Bank, Receivables, Inventory, Payables, GoodsReceivedNotInvoiced, OpeningEquity,
-        SalesRevenue, SalesReturns, CostOfGoodsSold, InventoryAdjustments,
+        SalesRevenue, SalesReturns, CostOfGoodsSold, InventoryAdjustments, ExchangeGain, ExchangeLoss,
     ];
 }
 
@@ -100,4 +102,7 @@ public static class SourceTypes
     public const string SalesReturn = "SalesReturn";
     public const string CustomerReceipt = "CustomerReceipt";
     public const string StockAdjustment = "StockAdjustment";
+    public const string ExpenseInvoice = "ExpenseInvoice";
+    public const string ExpenseVoucher = "ExpenseVoucher";
+    public const string Revaluation = "Revaluation";
 }

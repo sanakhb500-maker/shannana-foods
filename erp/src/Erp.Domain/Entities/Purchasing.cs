@@ -115,4 +115,7 @@ public class SupplierPayment : AuditableEntity
     public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
     public DateTime? ConfirmedAt { get; set; }
     public string? ConfirmedBy { get; set; }
+    /// <summary>Local amount that cleared the payable when confirmed (allocated part at the invoice rate, the rest at this payment's rate).</summary>
+    public decimal? LocalSettled { get; set; }
+    public List<SupplierPaymentAllocation> Allocations { get; set; } = [];
 }

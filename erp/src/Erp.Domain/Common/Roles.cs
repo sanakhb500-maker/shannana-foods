@@ -35,6 +35,7 @@ public static class Policies
     public const string ManageCustomerReceipts = "Manage.CustomerReceipts";
     public const string ViewAccounting = "View.Accounting";
     public const string ManageAccounting = "Manage.Accounting";
+    public const string ManageExpenseInvoices = "Manage.ExpenseInvoices";
 
     public static readonly IReadOnlyDictionary<string, string[]> Map = new Dictionary<string, string[]>
     {
@@ -59,5 +60,6 @@ public static class Policies
         [ManageCustomerReceipts] = [Roles.Admin, Roles.Accountant],
         [ViewAccounting] = [Roles.Admin, Roles.Accountant],
         [ManageAccounting] = [Roles.Admin, Roles.Accountant],
+        [ManageExpenseInvoices] = [Roles.Admin, Roles.Accountant, Roles.Purchasing],
     };
 }

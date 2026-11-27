@@ -1,5 +1,6 @@
 using Erp.Application.Common;
 using Erp.Application.Purchasing;
+using Erp.Application.Settlement;
 using Erp.Domain.Entities;
 using Erp.Infrastructure.Accounting;
 using Erp.Infrastructure.Common;
@@ -427,6 +428,9 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     {
         var inv = await LoadInvoiceAsync(id, ct);
         if (inv.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
+        if (inv.Status == DocumentStatus.Confirmed && await db.SupplierPaymentAllocations.AnyAsync(a => a.PurchaseInvoiceId == id &&
+                db.SupplierPayments.Any(p => p.Id == a.SupplierPaymentId && p.Status == DocumentStatus.Confirmed), ct))
+            throw new BusinessRuleException("Payments are already allocated to this invoice. Cancel them first.");
 
         if (inv.Status == DocumentStatus.Confirmed && inv.PurchaseOrderId is { } oid)
         {
@@ -441,8 +445,58 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     }
 
     // =====================================================================
-    //  Supplier payments
+    //  Supplier payments (optionally allocated to bills)
     // =====================================================================
+
+    private sealed record Bill(string Kind, int Id, string? Number, int SupplierId, int CurrencyId, DocumentStatus Status, decimal Total, decimal Rate,
+        DateOnly Date, DateOnly? DueDate);
+
+    private async Task<Bill?> FindBillAsync(string kind, int id, CancellationToken ct) => kind switch
+    {
+        InvoiceKinds.PurchaseInvoice => await db.PurchaseInvoices.AsNoTracking().Where(i => i.Id == id)
+            .Select(i => new Bill(InvoiceKinds.PurchaseInvoice, i.Id, i.Number, i.SupplierId, i.CurrencyId, i.Status, i.TotalAmount, i.ExchangeRate, i.Date, i.DueDate))
+            .FirstOrDefaultAsync(ct),
+        InvoiceKinds.ExpenseInvoice => await db.ExpenseInvoices.AsNoTracking().Where(i => i.Id == id)
+            .Select(i => new Bill(InvoiceKinds.ExpenseInvoice, i.Id, i.Number, i.SupplierId, i.CurrencyId, i.Status, i.TotalAmount, i.ExchangeRate, i.Date, i.DueDate))
+            .FirstOrDefaultAsync(ct),
+        _ => null,
+    };
+
+    /// <summary>Amount of a bill already settled by CONFIRMED payments (optionally ignoring one payment).</summary>
+    private async Task<decimal> SettledAsync(string kind, int id, int? exceptPaymentId, CancellationToken ct)
+    {
+        var q = db.SupplierPaymentAllocations.AsNoTracking().Where(a => db.SupplierPayments.Any(p =>
+            p.Id == a.SupplierPaymentId && p.Status == DocumentStatus.Confirmed && (exceptPaymentId == null || p.Id != exceptPaymentId)));
+        q = kind == InvoiceKinds.PurchaseInvoice ? q.Where(a => a.PurchaseInvoiceId == id) : q.Where(a => a.ExpenseInvoiceId == id);
+        return await q.SumAsync(a => (decimal?)a.Amount, ct) ?? 0m;
+    }
+
+    private async Task ValidateAllocationsAsync(int supplierId, int currencyId, decimal amount, List<AllocationInput>? allocations, int? paymentId, CancellationToken ct)
+    {
+        if (allocations is null or { Count: 0 }) return;
+        if (allocations.Any(a => a.Amount <= 0)) throw new BusinessRuleException("Allocation amounts must be greater than zero.");
+        if (allocations.Sum(a => a.Amount) > R4(amount)) throw new BusinessRuleException("The allocations exceed the payment amount.");
+        if (allocations.GroupBy(a => (a.Kind, a.InvoiceId)).Any(g => g.Count() > 1)) throw new BusinessRuleException("An invoice may appear only once among the allocations.");
+
+        foreach (var a in allocations)
+        {
+            var bill = await FindBillAsync(a.Kind, a.InvoiceId, ct) ?? throw new BusinessRuleException("An allocated invoice does not exist.");
+            if (bill.Status != DocumentStatus.Confirmed) throw new BusinessRuleException($"Invoice {bill.Number} is not confirmed, so it cannot be paid yet.");
+            if (bill.SupplierId != supplierId) throw new BusinessRuleException($"Invoice {bill.Number} belongs to another supplier.");
+            if (bill.CurrencyId != currencyId) throw new BusinessRuleException($"Invoice {bill.Number} is in a different currency from the payment.");
+            var outstanding = bill.Total - await SettledAsync(a.Kind, a.InvoiceId, paymentId, ct);
+            if (R4(a.Amount) > outstanding)
+                throw new BusinessRuleException($"The allocation to invoice {bill.Number} exceeds its outstanding amount ({outstanding:0.####}).");
+        }
+    }
+
+    private static List<SupplierPaymentAllocation> ToAllocations(List<AllocationInput>? input) =>
+        (input ?? []).Select(a => new SupplierPaymentAllocation
+        {
+            PurchaseInvoiceId = a.Kind == InvoiceKinds.PurchaseInvoice ? a.InvoiceId : null,
+            ExpenseInvoiceId = a.Kind == InvoiceKinds.ExpenseInvoice ? a.InvoiceId : null,
+            Amount = R4(a.Amount),
+        }).ToList();
 
     public async Task<PagedResult<SupplierPayment>> ListPaymentsAsync(PurchasingFilter f, CancellationToken ct)
     {
@@ -462,19 +516,21 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     }
 
     public async Task<SupplierPayment> GetPaymentAsync(int id, CancellationToken ct) =>
-        await db.SupplierPayments.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id, ct) ?? throw new NotFoundException("Payment not found.");
+        await db.SupplierPayments.AsNoTracking().Include(p => p.Allocations).FirstOrDefaultAsync(p => p.Id == id, ct) ?? throw new NotFoundException("Payment not found.");
 
     private async Task<SupplierPayment> LoadPaymentAsync(int id, CancellationToken ct) =>
-        await db.SupplierPayments.FirstOrDefaultAsync(p => p.Id == id, ct) ?? throw new NotFoundException("Payment not found.");
+        await db.SupplierPayments.Include(p => p.Allocations).FirstOrDefaultAsync(p => p.Id == id, ct) ?? throw new NotFoundException("Payment not found.");
 
     public async Task<SupplierPayment> CreatePaymentAsync(SupplierPaymentInput i, CancellationToken ct)
     {
         await EnsureSupplierAsync(i.SupplierId, ct);
         var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, null, ct);
+        await ValidateAllocationsAsync(i.SupplierId, i.CurrencyId, i.Amount, i.Allocations, null, ct);
         var p = new SupplierPayment
         {
             Date = i.Date, SupplierId = i.SupplierId, CurrencyId = i.CurrencyId, ExchangeRate = rate, Amount = R4(i.Amount),
             Method = i.Method, Reference = Clean(i.Reference), Notes = Clean(i.Notes), Status = DocumentStatus.Draft,
+            Allocations = ToAllocations(i.Allocations),
         };
         db.SupplierPayments.Add(p);
         await SaveAsync(ct);
@@ -487,8 +543,11 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         EnsureDraft(p.Status);
         await EnsureSupplierAsync(i.SupplierId, ct);
         var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, p.CurrencyId == i.CurrencyId ? p.ExchangeRate : null, ct);
+        await ValidateAllocationsAsync(i.SupplierId, i.CurrencyId, i.Amount, i.Allocations, id, ct);
         p.Date = i.Date; p.SupplierId = i.SupplierId; p.CurrencyId = i.CurrencyId; p.ExchangeRate = rate; p.Amount = R4(i.Amount);
         p.Method = i.Method; p.Reference = Clean(i.Reference); p.Notes = Clean(i.Notes);
+        db.SupplierPaymentAllocations.RemoveRange(p.Allocations);
+        p.Allocations = ToAllocations(i.Allocations);
         await SaveAsync(ct);
         return p;
     }
@@ -499,10 +558,34 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         EnsureDraft(p.Status);
         p.Number = await numbers.NextAsync(SequenceKeys.SupplierPayment, ct);
         await EnsureSupplierAsync(p.SupplierId, ct);
-        var paid = R4(p.Amount * p.ExchangeRate);
+
+        // Re-check against what is outstanding NOW (another payment may have settled the bill since this draft was saved).
+        await ValidateAllocationsAsync(p.SupplierId, p.CurrencyId, p.Amount,
+            p.Allocations.Select(a => new AllocationInput(a.PurchaseInvoiceId is not null ? InvoiceKinds.PurchaseInvoice : InvoiceKinds.ExpenseInvoice,
+                a.PurchaseInvoiceId ?? a.ExpenseInvoiceId!.Value, a.Amount)).ToList(), p.Id, ct);
+
+        // The allocated part clears the payable at the INVOICE's rate; what we actually paid in local currency uses THIS
+        // payment's rate. The difference is a realised exchange gain / loss. The unallocated part stays on account.
+        decimal settled = 0m, paidAllocated = 0m, allocatedTotal = 0m;
+        foreach (var a in p.Allocations)
+        {
+            var kind = a.PurchaseInvoiceId is not null ? InvoiceKinds.PurchaseInvoice : InvoiceKinds.ExpenseInvoice;
+            var bill = (await FindBillAsync(kind, a.PurchaseInvoiceId ?? a.ExpenseInvoiceId!.Value, ct))!;
+            settled += R4(a.Amount * bill.Rate);
+            paidAllocated += R4(a.Amount * p.ExchangeRate);
+            allocatedTotal += a.Amount;
+        }
+        var onAccount = R4((p.Amount - allocatedTotal) * p.ExchangeRate);
+        var paidLocal = paidAllocated + onAccount;
+        var cleared = settled + onAccount;
+        var fx = paidAllocated - settled; // paid more local currency than the liability that was booked = loss
+
+        p.LocalSettled = cleared;
         await gl.PostAsync(SourceTypes.SupplierPayment, p.Id, p.Date, $"Supplier payment {p.Number}", ct,
-            new PostLine(AccountRoles.Payables, paid, 0, PartyType.Supplier, p.SupplierId),
-            new PostLine(p.Method == PaymentMethod.Cash ? AccountRoles.Cash : AccountRoles.Bank, 0, paid));
+            new PostLine(AccountRoles.Payables, cleared, 0, PartyType.Supplier, p.SupplierId),
+            new PostLine(AccountRoles.ExchangeLoss, fx > 0 ? fx : 0, 0),
+            new PostLine(AccountRoles.ExchangeGain, 0, fx < 0 ? -fx : 0),
+            new PostLine(p.Method == PaymentMethod.Cash ? AccountRoles.Cash : AccountRoles.Bank, 0, paidLocal));
 
         p.Status = DocumentStatus.Confirmed;
         p.ConfirmedAt = DateTime.UtcNow;
@@ -525,6 +608,9 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     //  Reports
     // =====================================================================
 
+    /// <summary>Local amount a confirmed payment cleared (allocated part at the invoice rate, the rest at its own rate).</summary>
+    private static decimal Cleared(SupplierPayment p) => p.LocalSettled ?? R4(p.Amount * p.ExchangeRate);
+
     public async Task<SupplierStatement> GetStatementAsync(int supplierId, DateOnly? from, DateOnly? to, CancellationToken ct)
     {
         if (!await db.Suppliers.AnyAsync(s => s.Id == supplierId, ct)) throw new NotFoundException("Supplier not found.");
@@ -532,13 +618,15 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         var invoices = await db.PurchaseInvoices.AsNoTracking()
             .Where(i => i.SupplierId == supplierId && i.Status == DocumentStatus.Confirmed)
             .Select(i => new { i.Id, i.Date, i.Number, Ref = i.SupplierInvoiceNumber, i.CurrencyId, i.TotalAmount, i.ExchangeRate }).ToListAsync(ct);
+        var expenses = await db.ExpenseInvoices.AsNoTracking()
+            .Where(i => i.SupplierId == supplierId && i.Status == DocumentStatus.Confirmed)
+            .Select(i => new { i.Id, i.Date, i.Number, Ref = i.SupplierInvoiceNumber, i.CurrencyId, i.TotalAmount, i.ExchangeRate }).ToListAsync(ct);
         var payments = await db.SupplierPayments.AsNoTracking()
-            .Where(p => p.SupplierId == supplierId && p.Status == DocumentStatus.Confirmed)
-            .Select(p => new { p.Id, p.Date, p.Number, Ref = p.Reference, p.CurrencyId, p.Amount, p.ExchangeRate }).ToListAsync(ct);
+            .Where(p => p.SupplierId == supplierId && p.Status == DocumentStatus.Confirmed).ToListAsync(ct);
 
         // (date, kind order, id) keeps same-day entries stable: invoices before payments.
-        var entries = invoices.Select(i => (i.Date, Order: 0, i.Id, Type: "Invoice", i.Number, i.Ref, i.CurrencyId, Amount: i.TotalAmount, i.ExchangeRate, Debit: 0m, Credit: R4(i.TotalAmount * i.ExchangeRate)))
-            .Concat(payments.Select(p => (p.Date, Order: 1, p.Id, Type: "Payment", p.Number, p.Ref, p.CurrencyId, Amount: p.Amount, p.ExchangeRate, Debit: R4(p.Amount * p.ExchangeRate), Credit: 0m)))
+        var entries = invoices.Concat(expenses).Select(i => (i.Date, Order: 0, i.Id, Type: "Invoice", i.Number, i.Ref, i.CurrencyId, Amount: i.TotalAmount, i.ExchangeRate, Debit: 0m, Credit: R4(i.TotalAmount * i.ExchangeRate)))
+            .Concat(payments.Select(p => (p.Date, Order: 1, p.Id, Type: "Payment", p.Number, Ref: p.Reference, p.CurrencyId, Amount: p.Amount, p.ExchangeRate, Debit: Cleared(p), Credit: 0m)))
             .OrderBy(e => e.Date).ThenBy(e => e.Order).ThenBy(e => e.Id).ToList();
 
         var opening = from is { } f ? entries.Where(e => e.Date < f).Sum(e => e.Credit - e.Debit) : 0m;
@@ -556,17 +644,58 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     {
         var invoiced = await db.PurchaseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed)
             .GroupBy(i => i.SupplierId).Select(g => new { Id = g.Key, Sum = g.Sum(i => Math.Round(i.TotalAmount * i.ExchangeRate, 4)) }).ToListAsync(ct);
+        var expenses = await db.ExpenseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed)
+            .GroupBy(i => i.SupplierId).Select(g => new { Id = g.Key, Sum = g.Sum(i => Math.Round(i.TotalAmount * i.ExchangeRate, 4)) }).ToListAsync(ct);
         var paid = await db.SupplierPayments.AsNoTracking().Where(p => p.Status == DocumentStatus.Confirmed)
-            .GroupBy(p => p.SupplierId).Select(g => new { Id = g.Key, Sum = g.Sum(p => Math.Round(p.Amount * p.ExchangeRate, 4)) }).ToListAsync(ct);
+            .GroupBy(p => p.SupplierId).Select(g => new { Id = g.Key, Sum = g.Sum(p => p.LocalSettled ?? Math.Round(p.Amount * p.ExchangeRate, 4)) }).ToListAsync(ct);
 
-        var ids = invoiced.Select(x => x.Id).Union(paid.Select(x => x.Id)).ToList();
+        var ids = invoiced.Select(x => x.Id).Union(expenses.Select(x => x.Id)).Union(paid.Select(x => x.Id)).ToList();
         var suppliers = await db.Suppliers.AsNoTracking().Where(s => ids.Contains(s.Id)).ToListAsync(ct);
 
         return suppliers.Select(s =>
         {
-            var inv = invoiced.FirstOrDefault(x => x.Id == s.Id)?.Sum ?? 0m;
+            var inv = (invoiced.FirstOrDefault(x => x.Id == s.Id)?.Sum ?? 0m) + (expenses.FirstOrDefault(x => x.Id == s.Id)?.Sum ?? 0m);
             var pay = paid.FirstOrDefault(x => x.Id == s.Id)?.Sum ?? 0m;
             return new SupplierBalanceRow(s.Id, s.Code, s.NameAr, s.NameEn, inv, pay, inv - pay);
         }).OrderByDescending(r => r.Balance).ThenBy(r => r.Code).ToList();
+    }
+
+    public async Task<IReadOnlyList<OpenInvoiceRow>> GetOpenInvoicesAsync(int? supplierId, CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var purchase = await db.PurchaseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed && (supplierId == null || i.SupplierId == supplierId))
+            .Select(i => new { i.Id, i.Number, i.Date, i.DueDate, i.CurrencyId, i.ExchangeRate, i.TotalAmount }).ToListAsync(ct);
+        var expense = await db.ExpenseInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed && (supplierId == null || i.SupplierId == supplierId))
+            .Select(i => new { i.Id, i.Number, i.Date, i.DueDate, i.CurrencyId, i.ExchangeRate, i.TotalAmount }).ToListAsync(ct);
+
+        var allocs = await db.SupplierPaymentAllocations.AsNoTracking()
+            .Where(a => db.SupplierPayments.Any(p => p.Id == a.SupplierPaymentId && p.Status == DocumentStatus.Confirmed)).ToListAsync(ct);
+        var byPurchase = allocs.Where(a => a.PurchaseInvoiceId != null).GroupBy(a => a.PurchaseInvoiceId!.Value).ToDictionary(g => g.Key, g => g.Sum(a => a.Amount));
+        var byExpense = allocs.Where(a => a.ExpenseInvoiceId != null).GroupBy(a => a.ExpenseInvoiceId!.Value).ToDictionary(g => g.Key, g => g.Sum(a => a.Amount));
+
+        OpenInvoiceRow? Row(string kind, int id, string? number, DateOnly date, DateOnly? due, int cur, decimal rate, decimal total, decimal settled)
+        {
+            var outstanding = total - settled;
+            if (outstanding <= 0) return null;
+            var (days, bucket) = Ageing.Of(due ?? date, today);
+            return new OpenInvoiceRow(kind, id, number, date, due, cur, rate, total, settled, outstanding, R4(outstanding * rate), days, bucket);
+        }
+
+        return purchase.Select(i => Row(InvoiceKinds.PurchaseInvoice, i.Id, i.Number, i.Date, i.DueDate, i.CurrencyId, i.ExchangeRate, i.TotalAmount, byPurchase.GetValueOrDefault(i.Id)))
+            .Concat(expense.Select(i => Row(InvoiceKinds.ExpenseInvoice, i.Id, i.Number, i.Date, i.DueDate, i.CurrencyId, i.ExchangeRate, i.TotalAmount, byExpense.GetValueOrDefault(i.Id))))
+            .Where(r => r is not null).Select(r => r!).OrderBy(r => r.DueDate ?? r.Date).ThenBy(r => r.InvoiceId).ToList();
+    }
+
+    public async Task<IReadOnlyList<AgeingRow>> GetAgeingAsync(CancellationToken ct)
+    {
+        var open = await GetOpenInvoicesAsync(null, ct);
+        var supplierOf = new Dictionary<(string, int), int>();
+        foreach (var x in await db.PurchaseInvoices.AsNoTracking().Select(i => new { i.Id, i.SupplierId }).ToListAsync(ct)) supplierOf[(InvoiceKinds.PurchaseInvoice, x.Id)] = x.SupplierId;
+        foreach (var x in await db.ExpenseInvoices.AsNoTracking().Select(i => new { i.Id, i.SupplierId }).ToListAsync(ct)) supplierOf[(InvoiceKinds.ExpenseInvoice, x.Id)] = x.SupplierId;
+
+        var ids = open.Select(r => supplierOf[(r.Kind, r.InvoiceId)]).Distinct().ToList();
+        var suppliers = await db.Suppliers.AsNoTracking().Where(s => ids.Contains(s.Id)).ToListAsync(ct);
+        return suppliers.Select(s => Ageing.Row(s.Id, s.Code, s.NameAr, s.NameEn, open.Where(r => supplierOf[(r.Kind, r.InvoiceId)] == s.Id)))
+            .OrderByDescending(r => r.Total).ThenBy(r => r.Code).ToList();
     }
 }

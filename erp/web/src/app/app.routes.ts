@@ -51,6 +51,8 @@ export const routes: Routes = [
       doc('goods-receipts', 'receipt', [purchasingGuard]),
       doc('purchase-invoices', 'invoice', [purchasingGuard]),
       doc('supplier-payments', 'payment', [purchasingGuard]),
+      doc('expense-invoices', 'expenseInvoice', [purchasingGuard]),
+      { path: 'supplier-ageing', loadComponent: () => import('./pages/ageing-page').then((m) => m.AgeingPage), data: { side: 'supplier' }, canActivate: [purchasingGuard] },
       { path: 'supplier-statement', loadComponent: () => import('./pages/purchasing-reports').then((m) => m.SupplierStatementPage), canActivate: [purchasingGuard] },
       { path: 'supplier-balances', loadComponent: () => import('./pages/purchasing-reports').then((m) => m.SupplierBalancesPage), canActivate: [purchasingGuard] },
 
@@ -61,11 +63,14 @@ export const routes: Routes = [
       doc('sales-invoices', 'salesInvoice', [salesGuard]),
       doc('sales-returns', 'salesReturn', [salesGuard]),
       doc('customer-receipts', 'customerReceipt', [salesGuard]),
+      { path: 'customer-ageing', loadComponent: () => import('./pages/ageing-page').then((m) => m.AgeingPage), data: { side: 'customer' }, canActivate: [salesGuard] },
       { path: 'customer-statement', loadComponent: () => import('./pages/sales-reports').then((m) => m.CustomerStatementPage), canActivate: [salesGuard] },
       { path: 'customer-balances', loadComponent: () => import('./pages/sales-reports').then((m) => m.CustomerBalancesPage), canActivate: [salesGuard] },
 
       // accounting
       { path: 'journal', loadComponent: () => import('./pages/journal-page').then((m) => m.JournalPage), canActivate: [accountingGuard] },
+      doc('expense-vouchers', 'expenseVoucher', [accountingGuard]),
+      { path: 'revaluation', loadComponent: () => import('./pages/revaluation-page').then((m) => m.RevaluationPage), canActivate: [accountingGuard] },
       { path: 'ledger', loadComponent: () => import('./pages/accounting-reports').then((m) => m.LedgerPage), canActivate: [accountingGuard] },
       { path: 'trial-balance', loadComponent: () => import('./pages/accounting-reports').then((m) => m.TrialBalancePage), canActivate: [accountingGuard] },
       { path: 'income-statement', loadComponent: () => import('./pages/accounting-reports').then((m) => m.IncomeStatementPage), canActivate: [accountingGuard] },

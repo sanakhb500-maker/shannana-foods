@@ -108,6 +108,53 @@
         }
       </div>
 
+      @if (cfg.hint) {
+        <p class="hint-text">{{ i18n.t(cfg.hint) }}</p>
+      }
+
+      @if (cfg.allocations) {
+        <h3 class="sub">{{ i18n.t('alloc.title') }}</h3>
+        @if (editable()) {
+          @if (openInvoices().length) {
+            <div class="table-wrap lines">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>{{ i18n.t('alloc.invoice') }}</th>
+                    <th>{{ i18n.t('pur.dueDate') }}</th>
+                    <th class="num">{{ i18n.t('alloc.outstanding') }}</th>
+                    <th class="num">{{ i18n.t('alloc.apply') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of openInvoices(); track allocKeyOf(r)) {
+                    <tr>
+                      <td>{{ r.number }} <span class="badge muted">{{ i18n.t('src.' + r.kind) }}</span></td>
+                      <td [class.neg]="r.daysOverdue > 0">{{ r.dueDate ?? r.date }}</td>
+                      <td class="num">{{ r.outstanding | number: '1.2-4' }}</td>
+                      <td class="num"><input class="input qty" type="number" step="0.0001" min="0" [max]="r.outstanding" [name]="'al' + allocKeyOf(r)" [(ngModel)]="allocMap[allocKeyOf(r)]" /></td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div class="alloc-bar">
+              <button class="btn sm" type="button" (click)="autoAllocate()">{{ i18n.t('alloc.auto') }}</button>
+              <button class="btn sm" type="button" (click)="clearAllocations()">{{ i18n.t('alloc.clear') }}</button>
+              <span class="muted-text">{{ i18n.t('alloc.allocated') }}: {{ allocatedTotal() | number: '1.2-4' }} · {{ i18n.t('alloc.onAccount') }}: {{ (d['amount'] || 0) - allocatedTotal() | number: '1.2-4' }}</span>
+            </div>
+          } @else {
+            <p class="hint-text">{{ i18n.t('alloc.noOpen') }}</p>
+          }
+        } @else {
+          @for (a of savedAllocations(); track $index) {
+            <div class="srow"><span>{{ a.label }}</span><span>{{ a.amount | number: '1.2-4' }}</span></div>
+          } @empty {
+            <p class="hint-text">{{ i18n.t('alloc.none') }}</p>
+          }
+        }
+      }
+
       @if (cfg.lineCols) {
         <h3 class="sub">{{ i18n.t('inv.lines') }}</h3>
         <div class="table-wrap lines">
@@ -115,9 +162,9 @@
             <thead>
               <tr>
                 @for (c of visibleLineCols(); track c.key) {
-                  <th [class.num]="c.kind !== 'item'">{{ i18n.t(c.label) }}</th>
+                  <th [class.num]="c.kind === 'qty' || c.kind === 'price' || c.kind === 'amount' || c.kind === 'readonly'">{{ i18n.t(c.label) }}</th>
                 }
-                <th class="num">{{ i18n.t('pur.lineTotal') }}</th>
+                @if (cfg.lineKind !== 'expense') { <th class="num">{{ i18n.t('pur.lineTotal') }}</th> }
                 @if (editable()) { <th></th> }
               </tr>
             </thead>
@@ -136,6 +183,17 @@
                           </select>
                         </td>
                       }
+                      @case ('account') {
+                        <td>
+                          <select class="input" [name]="'ac' + i" [(ngModel)]="l['accountId']" [disabled]="!editable()">
+                            <option [ngValue]="0" disabled>{{ i18n.t('common.select') }}</option>
+                            @for (a of expenseAccounts(l['accountId']); track a.id) {
+                              <option [ngValue]="a.id">{{ lookups.accountLabel(a.id) }}</option>
+                            }
+                          </select>
+                        </td>
+                      }
+                      @case ('text') { <td><input class="input" [name]="'tx' + i" [(ngModel)]="l[c.key]" maxlength="200" [disabled]="!editable()" /></td> }
                       @case ('readonly') { <td class="num">{{ l[c.key] | number: '1.0-4' }}</td> }
                       @default {
                         <td class="num">
@@ -144,7 +202,7 @@
                       }
                     }
                   }
-                  <td class="num">{{ (l['quantity'] || 0) * (l['unitPrice'] || 0) | number: '1.2-4' }}</td>
+                  @if (cfg.lineKind !== 'expense') { <td class="num">{{ (l['quantity'] || 0) * (l['unitPrice'] || 0) | number: '1.2-4' }}</td> }
                   @if (editable()) {
                     <td class="actions"><button class="btn sm danger" type="button" (click)="removeLine(i)" [attr.aria-label]="i18n.t('common.remove')">✕</button></td>
                   }
@@ -155,7 +213,7 @@
             </tbody>
             <tfoot>
               <tr>
-                <th [attr.colspan]="visibleLineCols().length" class="num">{{ i18n.t('pur.total') }} ({{ lookups.currencyLabel(d['currencyId']) }})</th>
+                <th [attr.colspan]="cfg.lineKind === 'expense' ? visibleLineCols().length - 1 : visibleLineCols().length" class="num">{{ i18n.t('pur.total') }} ({{ lookups.currencyLabel(d['currencyId']) }})</th>
                 <th class="num">{{ docTotal() | number: '1.2-4' }}</th>
                 @if (editable()) { <th></th> }
               </tr>

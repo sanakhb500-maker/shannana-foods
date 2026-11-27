@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Erp.Infrastructure.Accounting;
 
 /// <summary>One side of an automatic posting, addressed by account ROLE (not id) so the chart can be re-coded freely.</summary>
-public readonly record struct PostLine(string Role, decimal Debit, decimal Credit, PartyType Party = PartyType.None, int? PartyId = null);
+public readonly record struct PostLine(string Role, decimal Debit, decimal Credit, PartyType Party = PartyType.None, int? PartyId = null, int? AccountId = null);
 
 /// <summary>
 /// The ONLY place automatic journal entries are created. Like <see cref="Inventory.StockPoster"/> it only STAGES entries
@@ -44,10 +44,10 @@ public sealed class JournalPoster(AppDbContext db, ICurrentUser user, DocumentNu
     }
 
     /// <summary>Stages a balanced, posted entry. Lines that are zero are skipped; an all-zero entry is not created.</summary>
-    public async Task PostAsync(string sourceType, int sourceId, DateOnly date, string description, CancellationToken ct, params PostLine[] lines)
+    public async Task<JournalEntry?> PostAsync(string sourceType, int? sourceId, DateOnly date, string description, CancellationToken ct, params PostLine[] lines)
     {
         var real = lines.Where(l => l.Debit != 0 || l.Credit != 0).ToList();
-        if (real.Count == 0) return;
+        if (real.Count == 0) return null;
         if (real.Sum(l => l.Debit) != real.Sum(l => l.Credit))
             throw new InvalidOperationException($"Unbalanced automatic entry for {sourceType} {sourceId}.");
 
@@ -60,9 +60,10 @@ public sealed class JournalPoster(AppDbContext db, ICurrentUser user, DocumentNu
         foreach (var l in real)
             entry.Lines.Add(new JournalLine
             {
-                AccountId = await AccountIdAsync(l.Role, ct), Debit = l.Debit, Credit = l.Credit, PartyType = l.Party, PartyId = l.PartyId,
+                AccountId = l.AccountId ?? await AccountIdAsync(l.Role, ct), Debit = l.Debit, Credit = l.Credit, PartyType = l.Party, PartyId = l.PartyId,
             });
         db.JournalEntries.Add(entry);
+        return entry;
     }
 
     /// <summary>Undoes every live entry of a document by posting mirror entries today, and marks the originals Reversed.</summary>

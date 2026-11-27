@@ -7,7 +7,7 @@ import { Api, parseApiError } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
-import { Paged } from '../core/models';
+import { OpenInvoice, Paged } from '../core/models';
 import { DOC_CONFIGS, DocConfig, DocField, ListCol } from './doc-config';
 
 type Doc = Record<string, any> & { lines?: Record<string, any>[] };
@@ -46,6 +46,9 @@ export class DocPage implements OnInit {
   readonly doc = signal<Doc | null>(null);
   readonly busy = signal(false);
   readonly orderOptions = signal<Row[]>([]);
+  /** Open invoices of the document's party in the document's currency: what a payment / receipt can be allocated to. */
+  readonly openInvoices = signal<OpenInvoice[]>([]);
+  allocMap: Record<string, number | null> = {};
   status = '';
   partyFilter: number | null = null;
   pendingOnly = false;
@@ -59,7 +62,17 @@ export class DocPage implements OnInit {
 
   /** A method, not a computed: line values are edited in place, which signals cannot see. */
   docTotal(): number {
-    return (this.doc()?.lines ?? []).reduce((s, l) => s + Number(l['quantity'] ?? 0) * Number(l['unitPrice'] ?? 0), 0);
+    const expense = this.cfg.lineKind === 'expense';
+    return (this.doc()?.lines ?? []).reduce((s, l) => s + (expense ? Number(l['amount'] ?? 0) : Number(l['quantity'] ?? 0) * Number(l['unitPrice'] ?? 0)), 0);
+  }
+
+  /** The party column key, or '' for documents with none. */
+  private get pk(): string {
+    return this.cfg.partyKey ?? '';
+  }
+
+  expenseAccounts(selected: number) {
+    return this.lookups.accounts().filter((a) => (a.type === 'Expense' && a.isActive) || a.id === selected);
   }
 
   ngOnInit(): void {
@@ -162,12 +175,13 @@ export class DocPage implements OnInit {
     const d = this.doc();
     if (!d) return;
     if (key === 'currencyId' || key === 'date') this.refreshRate(d);
+    if (this.cfg.allocations && (key === this.cfg.partyKey || key === 'currencyId')) this.resetAllocations();
     if (key === this.cfg.partyKey) {
       if (this.cfg.order) {
         d[this.cfg.order.idKey] = null;
-        this.loadOrderOptions(d[this.cfg.partyKey]);
+        this.loadOrderOptions(d[this.pk]);
       }
-      const party = (this.cfg.partyKey === 'supplierId' ? this.lookups.suppliers() : this.lookups.customers()).find((p) => p.id === d[this.cfg.partyKey]);
+      const party = (this.cfg.partyKey === 'supplierId' ? this.lookups.suppliers() : this.lookups.customers()).find((p) => p.id === d[this.pk]);
       if (party?.currencyId && !d['id'] && !this.orderId(d)) {
         d['currencyId'] = party.currencyId;
         this.refreshRate(d);
@@ -209,7 +223,7 @@ export class DocPage implements OnInit {
       next: (order) => {
         const d = this.doc();
         if (!d) return;
-        d[this.cfg.partyKey] = order[this.cfg.partyKey];
+        d[this.pk] = order[this.pk];
         d['currencyId'] = order['currencyId'];
         d['exchangeRate'] = order['exchangeRate'];
         const lines = order.lines
@@ -217,7 +231,7 @@ export class DocPage implements OnInit {
           .filter((l) => (l['quantity'] as number) > 0);
         d.lines = lines;
         this.message.set(lines.length ? '' : this.i18n.t('pur.nothingLeft'));
-        this.loadOrderOptions(order[this.cfg.partyKey]);
+        this.loadOrderOptions(order[this.pk]);
       },
       error: (e) => this.message.set(parseApiError(e).message),
     });
@@ -229,6 +243,7 @@ export class DocPage implements OnInit {
 
   // ---------- editor ----------
   private blankLine(): Record<string, any> {
+    if (this.cfg.lineKind === 'expense') return { accountId: 0, description: null, amount: null };
     return this.cfg.order
       ? { [this.cfg.order.lineKey]: null, itemId: 0, quantity: null, unitPrice: null }
       : { itemId: 0, quantity: null, unitPrice: null };
@@ -236,7 +251,7 @@ export class DocPage implements OnInit {
 
   private blank(): Doc {
     const local = this.lookups.currencies().find((c) => c.isLocal)?.id ?? null;
-    const d: Doc = { date: today(), [this.cfg.partyKey]: null, currencyId: local, exchangeRate: 1, notes: null, status: 'Draft', ...this.cfg.blankExtras?.() };
+    const d: Doc = { date: today(), ...(this.cfg.partyKey ? { [this.cfg.partyKey]: null } : {}), currencyId: local, exchangeRate: 1, notes: null, status: 'Draft', ...this.cfg.blankExtras?.() };
     if (this.cfg.lineCols) d.lines = [this.blankLine()];
     return d;
   }
@@ -261,7 +276,8 @@ export class DocPage implements OnInit {
     this.api.get<Doc>(`${this.cfg.endpoint}/${id}`).subscribe({
       next: (d) => {
         this.doc.set(d);
-        this.loadOrderOptions(d[this.cfg.partyKey]);
+        this.loadOrderOptions(d[this.pk]);
+        this.initAllocations(d);
         // an order that is no longer "Confirmed" would be missing from the options: make sure the linked one shows
         const oid = this.orderId(d);
         if (oid) {
@@ -301,13 +317,16 @@ export class DocPage implements OnInit {
     const d = this.doc()!;
     const b: Record<string, unknown> = {
       date: d['date'],
-      [this.cfg.partyKey]: d[this.cfg.partyKey] ?? 0,
+      ...(this.cfg.partyKey ? { [this.cfg.partyKey]: d[this.cfg.partyKey] ?? 0 } : {}),
       currencyId: d['currencyId'] ?? 0,
       exchangeRate: this.num(d['exchangeRate']),
       notes: (d['notes'] as string | null)?.trim() || null,
       ...this.cfg.bodyExtras?.(d),
     };
-    if (this.cfg.lineCols) {
+    if (this.cfg.allocations) b['allocations'] = this.allocationBody();
+    if (this.cfg.lineCols && this.cfg.lineKind === 'expense') {
+      b['lines'] = (d.lines ?? []).map((l) => ({ accountId: l['accountId'], description: (l['description'] as string | null)?.trim() || null, amount: Number(l['amount'] ?? 0) }));
+    } else if (this.cfg.lineCols) {
       const lineKey = this.cfg.order?.lineKey;
       b['lines'] = (d.lines ?? []).map((l) => ({
         ...(lineKey ? { [lineKey]: l[lineKey] ?? null } : {}),
@@ -375,5 +394,76 @@ export class DocPage implements OnInit {
     }
     if (!confirm(this.i18n.t(d['status'] === 'Confirmed' ? 'pur.confirmReverse' : 'inv.confirmCancel'))) return;
     this.run(() => this.api.post<Doc>(`${this.cfg.endpoint}/${d['id']}/cancel`));
+  }
+
+  // ---------- allocation of a payment / receipt to open invoices ----------
+  private allocKey(kind: string, id: number): string {
+    return `${kind}:${id}`;
+  }
+
+  /** Loads the allocation map from a saved document and the open invoices it can still be allocated to. */
+  private initAllocations(d: Doc): void {
+    this.allocMap = {};
+    if (!this.cfg.allocations) return;
+    for (const a of (d['allocations'] ?? []) as Record<string, any>[]) {
+      const kind = a['purchaseInvoiceId'] ? 'PurchaseInvoice' : a['expenseInvoiceId'] ? 'ExpenseInvoice' : 'SalesInvoice';
+      this.allocMap[this.allocKey(kind, a['purchaseInvoiceId'] ?? a['expenseInvoiceId'] ?? a['salesInvoiceId'])] = a['amount'];
+    }
+    this.loadOpenInvoices();
+  }
+
+  loadOpenInvoices(): void {
+    const d = this.doc();
+    if (!this.cfg.allocations || !d || d['status'] !== 'Draft' || !d[this.pk]) {
+      this.openInvoices.set([]);
+      return;
+    }
+    const url = this.cfg.allocations === 'supplier' ? `purchasing/open-invoices?supplierId=${d[this.pk]}` : `sales/open-invoices?customerId=${d[this.pk]}`;
+    this.api.get<OpenInvoice[]>(url).subscribe((rows) => this.openInvoices.set(rows.filter((r) => r.currencyId === d['currencyId'])));
+  }
+
+  /** The party or currency changed: what was assigned no longer applies. */
+  private resetAllocations(): void {
+    this.allocMap = {};
+    this.loadOpenInvoices();
+  }
+
+  allocKeyOf(r: OpenInvoice): string {
+    return this.allocKey(r.kind, r.invoiceId);
+  }
+
+  allocatedTotal(): number {
+    return Object.values(this.allocMap).reduce<number>((s, v) => s + Number(v ?? 0), 0);
+  }
+
+  /** Oldest first, up to the payment amount. */
+  autoAllocate(): void {
+    let left = Number(this.doc()?.['amount'] ?? 0);
+    this.allocMap = {};
+    for (const r of this.openInvoices()) {
+      const take = Math.min(left, r.outstanding);
+      if (take > 0) this.allocMap[this.allocKeyOf(r)] = Math.round(take * 10000) / 10000;
+      left -= take;
+    }
+  }
+
+  clearAllocations(): void {
+    this.allocMap = {};
+  }
+
+  private allocationBody(): { kind: string; invoiceId: number; amount: number }[] {
+    return Object.entries(this.allocMap)
+      .filter(([, v]) => Number(v ?? 0) > 0)
+      .map(([k, v]) => {
+        const [kind, id] = k.split(':');
+        return { kind, invoiceId: Number(id), amount: Number(v) };
+      });
+  }
+
+  savedAllocations(): { label: string; amount: number }[] {
+    return ((this.doc()?.['allocations'] ?? []) as Record<string, any>[]).map((a) => ({
+      label: a['purchaseInvoiceId'] ? `PINV #${a['purchaseInvoiceId']}` : a['expenseInvoiceId'] ? `EXP #${a['expenseInvoiceId']}` : `SINV #${a['salesInvoiceId']}`,
+      amount: a['amount'],
+    }));
   }
 }

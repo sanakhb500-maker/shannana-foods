@@ -49,11 +49,17 @@ public static class DbSeeder
                 ("4200", "مردودات ومسموحات المبيعات", "Sales returns and allowances", AccountType.Revenue, AccountRoles.SalesReturns),
                 ("5100", "تكلفة البضاعة المباعة", "Cost of goods sold", AccountType.Expense, AccountRoles.CostOfGoodsSold),
                 ("5200", "فروقات جرد المخزون", "Inventory adjustments", AccountType.Expense, AccountRoles.InventoryAdjustments),
+                ("4300", "أرباح فروقات الصرف", "Exchange gains", AccountType.Revenue, AccountRoles.ExchangeGain),
+                ("5300", "خسائر فروقات الصرف", "Exchange losses", AccountType.Expense, AccountRoles.ExchangeLoss),
+                ("5400", "إيجارات", "Rent", AccountType.Expense, ""),
+                ("5500", "كهرباء وماء واتصالات", "Utilities and communications", AccountType.Expense, ""),
+                ("5600", "رواتب وأجور", "Salaries and wages", AccountType.Expense, ""),
+                ("5700", "مصروفات عمومية أخرى", "Other general expenses", AccountType.Expense, ""),
             ];
             foreach (var l in leaves)
                 db.Accounts.Add(new Account
                 {
-                    Code = l.Code, NameAr = l.Ar, NameEn = l.En, Type = l.Type, ParentId = parents[l.Type].Id, IsPostable = true, SystemRole = l.Role,
+                    Code = l.Code, NameAr = l.Ar, NameEn = l.En, Type = l.Type, ParentId = parents[l.Type].Id, IsPostable = true, SystemRole = l.Role.Length == 0 ? null : l.Role,
                 });
         }
 

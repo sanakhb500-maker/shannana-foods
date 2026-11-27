@@ -62,6 +62,15 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
     public DbSet<AccountingSetting> AccountingSettings => Set<AccountingSetting>();
     public DbSet<DocumentSequence> DocumentSequences => Set<DocumentSequence>();
 
+    // expenses, settlement, revaluation
+    public DbSet<ExpenseInvoice> ExpenseInvoices => Set<ExpenseInvoice>();
+    public DbSet<ExpenseInvoiceLine> ExpenseInvoiceLines => Set<ExpenseInvoiceLine>();
+    public DbSet<ExpenseVoucher> ExpenseVouchers => Set<ExpenseVoucher>();
+    public DbSet<ExpenseVoucherLine> ExpenseVoucherLines => Set<ExpenseVoucherLine>();
+    public DbSet<SupplierPaymentAllocation> SupplierPaymentAllocations => Set<SupplierPaymentAllocation>();
+    public DbSet<CustomerReceiptAllocation> CustomerReceiptAllocations => Set<CustomerReceiptAllocation>();
+    public DbSet<RevaluationRun> RevaluationRuns => Set<RevaluationRun>();
+
     protected override void OnModelCreating(ModelBuilder b)
     {
         base.OnModelCreating(b);
@@ -171,12 +180,81 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
         ConfigurePurchasing(b);
         ConfigureSales(b);
         ConfigureAccounting(b);
+        ConfigureExpensesAndSettlement(b);
 
         b.Entity<DocumentSequence>(e =>
         {
             e.HasKey(x => x.Key);
             e.Property(x => x.Key).HasMaxLength(10);
             e.Property(x => x.RowVersion).IsRowVersion();
+        });
+    }
+
+    private static void ConfigureExpensesAndSettlement(ModelBuilder b)
+    {
+        b.Entity<ExpenseInvoice>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.HasIndex(x => new { x.SupplierId, x.Date });
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.SupplierInvoiceNumber).HasMaxLength(50);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.HasOne<Supplier>().WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.ExpenseInvoiceId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_ExpenseInvoice_Rate", "[ExchangeRate] > 0"));
+        });
+        b.Entity<ExpenseInvoiceLine>(e =>
+        {
+            e.Property(x => x.Description).HasMaxLength(200);
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_ExpenseInvoiceLine_Amount", "[Amount] > 0"));
+        });
+
+        b.Entity<ExpenseVoucher>(e =>
+        {
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.Property(x => x.Number).HasMaxLength(30);
+            e.Property(x => x.Payee).HasMaxLength(200);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.Status).HasConversion<int>();
+            e.Property(x => x.Method).HasConversion<int>();
+            e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.ExpenseVoucherId).OnDelete(DeleteBehavior.Cascade);
+            e.ToTable(t => t.HasCheckConstraint("CK_ExpenseVoucher_Rate", "[ExchangeRate] > 0"));
+        });
+        b.Entity<ExpenseVoucherLine>(e =>
+        {
+            e.Property(x => x.Description).HasMaxLength(200);
+            e.HasOne<Account>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_ExpenseVoucherLine_Amount", "[Amount] > 0"));
+        });
+
+        b.Entity<SupplierPayment>().HasMany(x => x.Allocations).WithOne().HasForeignKey(a => a.SupplierPaymentId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<SupplierPaymentAllocation>(e =>
+        {
+            e.HasIndex(x => x.PurchaseInvoiceId);
+            e.HasIndex(x => x.ExpenseInvoiceId);
+            e.HasOne<PurchaseInvoice>().WithMany().HasForeignKey(x => x.PurchaseInvoiceId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<ExpenseInvoice>().WithMany().HasForeignKey(x => x.ExpenseInvoiceId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_SupplierPaymentAllocation_One",
+                "[Amount] > 0 AND (([PurchaseInvoiceId] IS NOT NULL AND [ExpenseInvoiceId] IS NULL) OR ([PurchaseInvoiceId] IS NULL AND [ExpenseInvoiceId] IS NOT NULL))"));
+        });
+
+        b.Entity<CustomerReceipt>().HasMany(x => x.Allocations).WithOne().HasForeignKey(a => a.CustomerReceiptId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<CustomerReceiptAllocation>(e =>
+        {
+            e.HasIndex(x => x.SalesInvoiceId);
+            e.HasOne<SalesInvoice>().WithMany().HasForeignKey(x => x.SalesInvoiceId).OnDelete(DeleteBehavior.Restrict);
+            e.ToTable(t => t.HasCheckConstraint("CK_CustomerReceiptAllocation_Amount", "[Amount] > 0"));
+        });
+
+        b.Entity<RevaluationRun>(e =>
+        {
+            e.HasIndex(x => x.AsOf).IsUnique();
+            e.HasOne(x => x.JournalEntry).WithMany().HasForeignKey(x => x.JournalEntryId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ReversalEntry).WithMany().HasForeignKey(x => x.ReversalEntryId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

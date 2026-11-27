@@ -1,4 +1,5 @@
 using Erp.Application.Common;
+using Erp.Application.Settlement;
 using Erp.Domain.Entities;
 
 namespace Erp.Application.Sales;
@@ -26,7 +27,7 @@ public sealed record SalesReturnInput(DateOnly Date, int CustomerId, int Warehou
     string? Notes, List<ReturnLineInput> Lines);
 
 public sealed record CustomerReceiptInput(DateOnly Date, int CustomerId, int CurrencyId, decimal? ExchangeRate, decimal Amount,
-    PaymentMethod Method, string? Reference, string? Notes);
+    PaymentMethod Method, string? Reference, string? Notes, List<AllocationInput>? Allocations = null);
 
 /// <param name="DeliveryNoteIds">The stops, in visiting order.</param>
 public sealed record TripInput(DateOnly Date, int DriverId, int VehicleId, string? Notes, List<int> DeliveryNoteIds);
@@ -128,4 +129,6 @@ public interface ISalesService
     // reports
     Task<CustomerStatement> GetStatementAsync(int customerId, DateOnly? from, DateOnly? to, CancellationToken ct);
     Task<IReadOnlyList<CustomerBalanceRow>> GetCustomerBalancesAsync(CancellationToken ct);
+    Task<IReadOnlyList<OpenInvoiceRow>> GetOpenInvoicesAsync(int? customerId, CancellationToken ct);
+    Task<IReadOnlyList<AgeingRow>> GetAgeingAsync(CancellationToken ct);
 }

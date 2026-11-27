@@ -1,5 +1,6 @@
 using Erp.Application.Common;
 using Erp.Application.Sales;
+using Erp.Application.Settlement;
 using Erp.Domain.Entities;
 using Erp.Infrastructure.Accounting;
 using Erp.Infrastructure.Common;
@@ -463,6 +464,9 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var inv = await LoadInvoiceAsync(id, ct);
         if (inv.Status == DocumentStatus.Cancelled) throw new BusinessRuleException("The document is already cancelled.");
+        if (inv.Status == DocumentStatus.Confirmed && await db.CustomerReceiptAllocations.AnyAsync(a => a.SalesInvoiceId == id &&
+                db.CustomerReceipts.Any(r => r.Id == a.CustomerReceiptId && r.Status == DocumentStatus.Confirmed), ct))
+            throw new BusinessRuleException("Payments are already allocated to this invoice. Cancel them first.");
 
         if (inv.Status == DocumentStatus.Confirmed && inv.SalesOrderId is { } oid)
         {
@@ -593,8 +597,40 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     }
 
     // =====================================================================
-    //  Customer receipts
+    //  Customer receipts (optionally allocated to invoices)
     // =====================================================================
+
+    /// <summary>Amount of a sales invoice already settled by CONFIRMED receipts (optionally ignoring one receipt).</summary>
+    private async Task<decimal> SettledAsync(int invoiceId, int? exceptReceiptId, CancellationToken ct) =>
+        await db.CustomerReceiptAllocations.AsNoTracking()
+            .Where(a => a.SalesInvoiceId == invoiceId && db.CustomerReceipts.Any(r =>
+                r.Id == a.CustomerReceiptId && r.Status == DocumentStatus.Confirmed && (exceptReceiptId == null || r.Id != exceptReceiptId)))
+            .SumAsync(a => (decimal?)a.Amount, ct) ?? 0m;
+
+    private async Task ValidateAllocationsAsync(int customerId, int currencyId, decimal amount, List<AllocationInput>? allocations, int? receiptId, CancellationToken ct)
+    {
+        if (allocations is null or { Count: 0 }) return;
+        if (allocations.Any(a => a.Kind != InvoiceKinds.SalesInvoice)) throw new BusinessRuleException("A receipt can only be allocated to sales invoices.");
+        if (allocations.Any(a => a.Amount <= 0)) throw new BusinessRuleException("Allocation amounts must be greater than zero.");
+        if (allocations.Sum(a => a.Amount) > R4(amount)) throw new BusinessRuleException("The allocations exceed the payment amount.");
+        if (allocations.GroupBy(a => a.InvoiceId).Any(g => g.Count() > 1)) throw new BusinessRuleException("An invoice may appear only once among the allocations.");
+
+        foreach (var a in allocations)
+        {
+            var inv = await db.SalesInvoices.AsNoTracking().Where(i => i.Id == a.InvoiceId)
+                          .Select(i => new { i.Number, i.CustomerId, i.CurrencyId, i.Status, i.TotalAmount }).FirstOrDefaultAsync(ct)
+                      ?? throw new BusinessRuleException("An allocated invoice does not exist.");
+            if (inv.Status != DocumentStatus.Confirmed) throw new BusinessRuleException($"Invoice {inv.Number} is not confirmed, so it cannot be paid yet.");
+            if (inv.CustomerId != customerId) throw new BusinessRuleException($"Invoice {inv.Number} belongs to another customer.");
+            if (inv.CurrencyId != currencyId) throw new BusinessRuleException($"Invoice {inv.Number} is in a different currency from the payment.");
+            var outstanding = inv.TotalAmount - await SettledAsync(a.InvoiceId, receiptId, ct);
+            if (R4(a.Amount) > outstanding)
+                throw new BusinessRuleException($"The allocation to invoice {inv.Number} exceeds its outstanding amount ({outstanding:0.####}).");
+        }
+    }
+
+    private static List<CustomerReceiptAllocation> ToAllocations(List<AllocationInput>? input) =>
+        (input ?? []).Select(a => new CustomerReceiptAllocation { SalesInvoiceId = a.InvoiceId, Amount = R4(a.Amount) }).ToList();
 
     public async Task<PagedResult<CustomerReceipt>> ListReceiptsAsync(SalesFilter f, CancellationToken ct)
     {
@@ -614,19 +650,21 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     }
 
     public async Task<CustomerReceipt> GetReceiptAsync(int id, CancellationToken ct) =>
-        await db.CustomerReceipts.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw new NotFoundException("Receipt not found.");
+        await db.CustomerReceipts.AsNoTracking().Include(r => r.Allocations).FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw new NotFoundException("Receipt not found.");
 
     private async Task<CustomerReceipt> LoadReceiptAsync(int id, CancellationToken ct) =>
-        await db.CustomerReceipts.FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw new NotFoundException("Receipt not found.");
+        await db.CustomerReceipts.Include(r => r.Allocations).FirstOrDefaultAsync(r => r.Id == id, ct) ?? throw new NotFoundException("Receipt not found.");
 
     public async Task<CustomerReceipt> CreateReceiptAsync(CustomerReceiptInput i, CancellationToken ct)
     {
         await EnsureCustomerAsync(i.CustomerId, ct);
         var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, null, ct);
+        await ValidateAllocationsAsync(i.CustomerId, i.CurrencyId, i.Amount, i.Allocations, null, ct);
         var r = new CustomerReceipt
         {
             Date = i.Date, CustomerId = i.CustomerId, CurrencyId = i.CurrencyId, ExchangeRate = rate, Amount = R4(i.Amount),
             Method = i.Method, Reference = Clean(i.Reference), Notes = Clean(i.Notes), Status = DocumentStatus.Draft,
+            Allocations = ToAllocations(i.Allocations),
         };
         db.CustomerReceipts.Add(r);
         await SaveAsync(ct);
@@ -639,8 +677,11 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         EnsureDraft(r.Status);
         await EnsureCustomerAsync(i.CustomerId, ct);
         var rate = await db.ResolveRateAsync(i.CurrencyId, i.Date, i.ExchangeRate, r.CurrencyId == i.CurrencyId ? r.ExchangeRate : null, ct);
+        await ValidateAllocationsAsync(i.CustomerId, i.CurrencyId, i.Amount, i.Allocations, id, ct);
         r.Date = i.Date; r.CustomerId = i.CustomerId; r.CurrencyId = i.CurrencyId; r.ExchangeRate = rate; r.Amount = R4(i.Amount);
         r.Method = i.Method; r.Reference = Clean(i.Reference); r.Notes = Clean(i.Notes);
+        db.CustomerReceiptAllocations.RemoveRange(r.Allocations);
+        r.Allocations = ToAllocations(i.Allocations);
         await SaveAsync(ct);
         return r;
     }
@@ -651,10 +692,31 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         EnsureDraft(r.Status);
         r.Number = await numbers.NextAsync(SequenceKeys.CustomerReceipt, ct);
         await EnsureCustomerAsync(r.CustomerId, ct);
-        var received = R4(r.Amount * r.ExchangeRate);
+        await ValidateAllocationsAsync(r.CustomerId, r.CurrencyId, r.Amount,
+            r.Allocations.Select(a => new AllocationInput(InvoiceKinds.SalesInvoice, a.SalesInvoiceId, a.Amount)).ToList(), r.Id, ct);
+
+        // The allocated part clears the receivable at the INVOICE's rate; the money actually received in local currency uses
+        // THIS receipt's rate. The difference is a realised exchange gain / loss. The unallocated part stays on account.
+        decimal settled = 0m, receivedAllocated = 0m, allocatedTotal = 0m;
+        foreach (var a in r.Allocations)
+        {
+            var rate = await db.SalesInvoices.AsNoTracking().Where(i => i.Id == a.SalesInvoiceId).Select(i => i.ExchangeRate).FirstAsync(ct);
+            settled += R4(a.Amount * rate);
+            receivedAllocated += R4(a.Amount * r.ExchangeRate);
+            allocatedTotal += a.Amount;
+        }
+        var onAccount = R4((r.Amount - allocatedTotal) * r.ExchangeRate);
+        var receivedLocal = receivedAllocated + onAccount;
+        var cleared = settled + onAccount;
+        var fx = receivedAllocated - settled; // received more local currency than the receivable that was booked = gain
+
+        r.LocalSettled = cleared;
         await gl.PostAsync(SourceTypes.CustomerReceipt, r.Id, r.Date, $"Customer receipt {r.Number}", ct,
-            new PostLine(r.Method == PaymentMethod.Cash ? AccountRoles.Cash : AccountRoles.Bank, received, 0),
-            new PostLine(AccountRoles.Receivables, 0, received, PartyType.Customer, r.CustomerId));
+            new PostLine(r.Method == PaymentMethod.Cash ? AccountRoles.Cash : AccountRoles.Bank, receivedLocal, 0),
+            new PostLine(AccountRoles.ExchangeLoss, fx < 0 ? -fx : 0, 0),
+            new PostLine(AccountRoles.Receivables, 0, cleared, PartyType.Customer, r.CustomerId),
+            new PostLine(AccountRoles.ExchangeGain, 0, fx > 0 ? fx : 0));
+
         r.Status = DocumentStatus.Confirmed;
         r.ConfirmedAt = DateTime.UtcNow;
         r.ConfirmedBy = user.UserName;
@@ -838,6 +900,9 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     //  Reports
     // =====================================================================
 
+    /// <summary>Local amount a confirmed receipt cleared (allocated part at the invoice rate, the rest at its own rate).</summary>
+    private static decimal Cleared(CustomerReceipt r) => r.LocalSettled ?? R4(r.Amount * r.ExchangeRate);
+
     public async Task<CustomerStatement> GetStatementAsync(int customerId, DateOnly? from, DateOnly? to, CancellationToken ct)
     {
         var customer = await db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == customerId, ct)
@@ -847,13 +912,12 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
             .Select(i => new { i.Id, i.Date, i.Number, i.CurrencyId, i.TotalAmount, i.ExchangeRate }).ToListAsync(ct);
         var returns = await db.SalesReturns.AsNoTracking().Where(r => r.CustomerId == customerId && r.Status == DocumentStatus.Confirmed)
             .Select(r => new { r.Id, r.Date, r.Number, r.CurrencyId, r.TotalAmount, r.ExchangeRate }).ToListAsync(ct);
-        var receipts = await db.CustomerReceipts.AsNoTracking().Where(r => r.CustomerId == customerId && r.Status == DocumentStatus.Confirmed)
-            .Select(r => new { r.Id, r.Date, r.Number, Ref = r.Reference, r.CurrencyId, r.Amount, r.ExchangeRate }).ToListAsync(ct);
+        var receipts = await db.CustomerReceipts.AsNoTracking().Where(r => r.CustomerId == customerId && r.Status == DocumentStatus.Confirmed).ToListAsync(ct);
 
         // Debit = they owe more (invoice); credit = they owe less (return, receipt). Same-day order: invoices, returns, receipts.
         var entries = invoices.Select(i => (i.Date, Order: 0, i.Id, Type: "Invoice", i.Number, Ref: (string?)null, i.CurrencyId, Amount: i.TotalAmount, i.ExchangeRate, Debit: R4(i.TotalAmount * i.ExchangeRate), Credit: 0m))
             .Concat(returns.Select(r => (r.Date, Order: 1, r.Id, Type: "Return", r.Number, Ref: (string?)null, r.CurrencyId, Amount: r.TotalAmount, r.ExchangeRate, Debit: 0m, Credit: R4(r.TotalAmount * r.ExchangeRate))))
-            .Concat(receipts.Select(r => (r.Date, Order: 2, r.Id, Type: "Receipt", r.Number, Ref: r.Ref, r.CurrencyId, Amount: r.Amount, r.ExchangeRate, Debit: 0m, Credit: R4(r.Amount * r.ExchangeRate))))
+            .Concat(receipts.Select(r => (r.Date, Order: 2, r.Id, Type: "Receipt", r.Number, Ref: r.Reference, r.CurrencyId, Amount: r.Amount, r.ExchangeRate, Debit: 0m, Credit: Cleared(r))))
             .OrderBy(e => e.Date).ThenBy(e => e.Order).ThenBy(e => e.Id).ToList();
 
         var opening = from is { } f ? entries.Where(e => e.Date < f).Sum(e => e.Debit - e.Credit) : 0m;
@@ -874,7 +938,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         var returned = await db.SalesReturns.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed)
             .GroupBy(r => r.CustomerId).Select(g => new { Id = g.Key, Sum = g.Sum(r => Math.Round(r.TotalAmount * r.ExchangeRate, 4)) }).ToListAsync(ct);
         var received = await db.CustomerReceipts.AsNoTracking().Where(r => r.Status == DocumentStatus.Confirmed)
-            .GroupBy(r => r.CustomerId).Select(g => new { Id = g.Key, Sum = g.Sum(r => Math.Round(r.Amount * r.ExchangeRate, 4)) }).ToListAsync(ct);
+            .GroupBy(r => r.CustomerId).Select(g => new { Id = g.Key, Sum = g.Sum(r => r.LocalSettled ?? Math.Round(r.Amount * r.ExchangeRate, 4)) }).ToListAsync(ct);
 
         var ids = invoiced.Select(x => x.Id).Union(returned.Select(x => x.Id)).Union(received.Select(x => x.Id)).ToList();
         var customers = await db.Customers.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync(ct);
@@ -886,5 +950,35 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
             var rec = received.FirstOrDefault(x => x.Id == c.Id)?.Sum ?? 0m;
             return new CustomerBalanceRow(c.Id, c.Code, c.NameAr, c.NameEn, inv, ret, rec, inv - ret - rec, c.CreditLimit);
         }).OrderByDescending(r => r.Balance).ThenBy(r => r.Code).ToList();
+    }
+
+    public async Task<IReadOnlyList<OpenInvoiceRow>> GetOpenInvoicesAsync(int? customerId, CancellationToken ct)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var invoices = await db.SalesInvoices.AsNoTracking().Where(i => i.Status == DocumentStatus.Confirmed && (customerId == null || i.CustomerId == customerId))
+            .Select(i => new { i.Id, i.Number, i.Date, i.DueDate, i.CurrencyId, i.ExchangeRate, i.TotalAmount }).ToListAsync(ct);
+        var settled = (await db.CustomerReceiptAllocations.AsNoTracking()
+            .Where(a => db.CustomerReceipts.Any(r => r.Id == a.CustomerReceiptId && r.Status == DocumentStatus.Confirmed)).ToListAsync(ct))
+            .GroupBy(a => a.SalesInvoiceId).ToDictionary(g => g.Key, g => g.Sum(a => a.Amount));
+
+        return invoices.Select(i =>
+            {
+                var done = settled.GetValueOrDefault(i.Id);
+                var outstanding = i.TotalAmount - done;
+                var (days, bucket) = Ageing.Of(i.DueDate ?? i.Date, today);
+                return new OpenInvoiceRow(InvoiceKinds.SalesInvoice, i.Id, i.Number, i.Date, i.DueDate, i.CurrencyId, i.ExchangeRate, i.TotalAmount, done,
+                    outstanding, R4(outstanding * i.ExchangeRate), days, bucket);
+            })
+            .Where(r => r.Outstanding > 0).OrderBy(r => r.DueDate ?? r.Date).ThenBy(r => r.InvoiceId).ToList();
+    }
+
+    public async Task<IReadOnlyList<AgeingRow>> GetAgeingAsync(CancellationToken ct)
+    {
+        var open = await GetOpenInvoicesAsync(null, ct);
+        var customerOf = await db.SalesInvoices.AsNoTracking().Select(i => new { i.Id, i.CustomerId }).ToDictionaryAsync(i => i.Id, i => i.CustomerId, ct);
+        var ids = open.Select(r => customerOf[r.InvoiceId]).Distinct().ToList();
+        var customers = await db.Customers.AsNoTracking().Where(c => ids.Contains(c.Id)).ToListAsync(ct);
+        return customers.Select(c => Ageing.Row(c.Id, c.Code, c.NameAr, c.NameEn, open.Where(r => customerOf[r.InvoiceId] == c.Id)))
+            .OrderByDescending(r => r.Total).ThenBy(r => r.Code).ToList();
     }
 }

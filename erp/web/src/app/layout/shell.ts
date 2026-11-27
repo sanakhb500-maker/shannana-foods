@@ -107,6 +107,8 @@ export class Shell {
     { path: '/goods-receipts', label: 'nav.goodsReceipts' },
     { path: '/purchase-invoices', label: 'nav.purchaseInvoices' },
     { path: '/supplier-payments', label: 'nav.supplierPayments' },
+    { path: '/expense-invoices', label: 'nav.expenseInvoices' },
+    { path: '/supplier-ageing', label: 'nav.supplierAgeing' },
     { path: '/supplier-statement', label: 'nav.supplierStatement' },
     { path: '/supplier-balances', label: 'nav.supplierBalances' },
   ];
@@ -120,6 +122,7 @@ export class Shell {
     { path: '/sales-invoices', label: 'nav.salesInvoices' },
     { path: '/sales-returns', label: 'nav.salesReturns' },
     { path: '/customer-receipts', label: 'nav.customerReceipts' },
+    { path: '/customer-ageing', label: 'nav.customerAgeing' },
     { path: '/customer-statement', label: 'nav.customerStatement' },
     { path: '/customer-balances', label: 'nav.customerBalances' },
   ];
@@ -129,6 +132,8 @@ export class Shell {
   readonly accounting: NavItem[] = [
     { path: '/accounts', label: 'nav.accounts' },
     { path: '/journal', label: 'nav.journal' },
+    { path: '/expense-vouchers', label: 'nav.expenseVouchers' },
+    { path: '/revaluation', label: 'nav.revaluation' },
     { path: '/ledger', label: 'nav.ledger' },
     { path: '/trial-balance', label: 'nav.trialBalance' },
     { path: '/income-statement', label: 'nav.incomeStatement' },

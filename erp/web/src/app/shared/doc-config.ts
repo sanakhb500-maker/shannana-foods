@@ -2,7 +2,8 @@ import { WRITE_ROLES } from '../core/models';
 
 export type DocKind =
   | 'order' | 'receipt' | 'invoice' | 'payment'
-  | 'salesOrder' | 'delivery' | 'salesInvoice' | 'salesReturn' | 'customerReceipt';
+  | 'salesOrder' | 'delivery' | 'salesInvoice' | 'salesReturn' | 'customerReceipt'
+  | 'expenseInvoice' | 'expenseVoucher';
 
 /** Named option sources the page resolves from cached lookups. */
 export type OptionSource = 'suppliers' | 'customers' | 'warehouses' | 'currencies' | 'orders' | 'methods';
@@ -23,7 +24,7 @@ export interface DocField {
 export interface LineCol {
   key: string;
   label: string;
-  kind: 'item' | 'qty' | 'price' | 'readonly';
+  kind: 'item' | 'qty' | 'price' | 'readonly' | 'account' | 'text' | 'amount';
   /** Shown only once the document is no longer a draft (e.g. received / invoiced progress). */
   afterDraft?: boolean;
 }
@@ -58,8 +59,14 @@ export interface DocConfig {
   newLabel: string;
   endpoint: string;
   writeRoles: readonly string[];
-  /** The counterparty: supplier or customer. */
-  partyKey: 'supplierId' | 'customerId';
+  /** The counterparty: supplier or customer (absent for documents with no counterparty, e.g. expense vouchers). */
+  partyKey?: 'supplierId' | 'customerId';
+  /** Lines are expense lines (account + amount) instead of item lines (item + quantity + price). */
+  lineKind?: 'item' | 'expense';
+  /** The document can be allocated to open invoices of its supplier / customer. */
+  allocations?: 'supplier' | 'customer';
+  /** i18n key of a note shown under the header. */
+  hint?: string;
   /** Label of the "only open orders" filter. */
   pendingLabel?: string;
   fields: DocField[];
@@ -141,7 +148,7 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
   },
   invoice: {
     kind: 'invoice', title: 'nav.purchaseInvoices', newLabel: 'pur.newInvoice', endpoint: 'purchaseinvoices', writeRoles: WRITE_ROLES.purchasing,
-    partyKey: 'supplierId', filters: ['party'],
+    partyKey: 'supplierId', filters: ['party'], hint: 'pur.varianceHint',
     order: { ...purchaseLink, remaining: (l) => l['receivedQuantity'] - l['invoicedQuantity'] },
     fields: [
       date, { key: 'dueDate', label: 'pur.dueDate', type: 'date' }, purchaseOrder, supplier,
@@ -159,7 +166,7 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
   },
   payment: {
     kind: 'payment', title: 'nav.supplierPayments', newLabel: 'pur.newPayment', endpoint: 'supplierpayments', writeRoles: WRITE_ROLES.supplierPayments,
-    partyKey: 'supplierId', filters: ['party'],
+    partyKey: 'supplierId', filters: ['party'], allocations: 'supplier',
     fields: [
       date, supplier, { key: 'amount', label: 'pur.amount', type: 'number', step: '0.0001', required: true }, currency, rate,
       { key: 'method', label: 'pur.method', type: 'select', options: 'methods', required: true },
@@ -244,7 +251,7 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
   },
   customerReceipt: {
     kind: 'customerReceipt', title: 'nav.customerReceipts', newLabel: 'sal.newReceipt', endpoint: 'customerreceipts', writeRoles: WRITE_ROLES.customerReceipts,
-    partyKey: 'customerId', filters: ['party'],
+    partyKey: 'customerId', filters: ['party'], allocations: 'customer',
     fields: [
       date, customer, { key: 'amount', label: 'pur.amount', type: 'number', step: '0.0001', required: true }, currency, rate,
       { key: 'method', label: 'pur.method', type: 'select', options: 'methods', required: true },
@@ -257,6 +264,46 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
       { key: 'customerId', label: 'f.customer', kind: 'customer' }, { key: 'amount', label: 'pur.amount', kind: 'amount' },
       { key: 'currencyId', label: 'f.currency', kind: 'currency' }, { key: 'method', label: 'pur.method', kind: 'method' },
       { key: 'reference', label: 'pur.reference', kind: 'text' }, { key: 'status', label: 'common.status', kind: 'status' },
+    ],
+  },
+
+  // ---------------- expenses ----------------
+  expenseInvoice: {
+    kind: 'expenseInvoice', title: 'nav.expenseInvoices', newLabel: 'exp.newInvoice', endpoint: 'expenseinvoices', writeRoles: WRITE_ROLES.expenseInvoices,
+    partyKey: 'supplierId', lineKind: 'expense', filters: ['party'],
+    fields: [date, { key: 'dueDate', label: 'pur.dueDate', type: 'date' }, supplier, { key: 'supplierInvoiceNumber', label: 'pur.supplierInvoiceNo', type: 'text', maxlength: 50 }, currency, rate, notes],
+    lineCols: [
+      { key: 'accountId', label: 'acc.account', kind: 'account' },
+      { key: 'description', label: 'f.description', kind: 'text' },
+      { key: 'amount', label: 'pur.amount', kind: 'amount' },
+    ],
+    blankExtras: () => ({ dueDate: null, supplierInvoiceNumber: null }),
+    bodyExtras: (d) => ({ dueDate: d['dueDate'] || null, supplierInvoiceNumber: txt(d['supplierInvoiceNumber']) }),
+    listCols: [
+      { key: 'number', label: 'inv.number', kind: 'text' }, { key: 'supplierInvoiceNumber', label: 'pur.supplierInvoiceNo', kind: 'text' },
+      { key: 'date', label: 'f.date', kind: 'date' }, { key: 'dueDate', label: 'pur.dueDate', kind: 'date' },
+      { key: 'supplierId', label: 'f.supplier', kind: 'supplier' }, { key: 'totalAmount', label: 'pur.total', kind: 'amount' },
+      { key: 'currencyId', label: 'f.currency', kind: 'currency' }, { key: 'status', label: 'common.status', kind: 'status' },
+    ],
+  },
+  expenseVoucher: {
+    kind: 'expenseVoucher', title: 'nav.expenseVouchers', newLabel: 'exp.newVoucher', endpoint: 'expensevouchers', writeRoles: WRITE_ROLES.accounting,
+    lineKind: 'expense', filters: [],
+    fields: [
+      date, currency, rate, { key: 'method', label: 'pur.method', type: 'select', options: 'methods', required: true },
+      { key: 'payee', label: 'exp.payee', type: 'text', maxlength: 200 }, notes,
+    ],
+    lineCols: [
+      { key: 'accountId', label: 'acc.account', kind: 'account' },
+      { key: 'description', label: 'f.description', kind: 'text' },
+      { key: 'amount', label: 'pur.amount', kind: 'amount' },
+    ],
+    blankExtras: () => ({ method: 'Cash', payee: null }),
+    bodyExtras: (d) => ({ method: d['method'], payee: txt(d['payee']) }),
+    listCols: [
+      { key: 'number', label: 'inv.number', kind: 'text' }, { key: 'date', label: 'f.date', kind: 'date' }, { key: 'payee', label: 'exp.payee', kind: 'text' },
+      { key: 'totalAmount', label: 'pur.total', kind: 'amount' }, { key: 'currencyId', label: 'f.currency', kind: 'currency' },
+      { key: 'method', label: 'pur.method', kind: 'method' }, { key: 'status', label: 'common.status', kind: 'status' },
     ],
   },
 };

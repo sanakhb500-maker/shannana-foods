@@ -118,8 +118,19 @@ public class JournalEntriesController(IAccountingService svc, IValidator<Journal
 [ApiController]
 [Authorize(Policy = Policies.ViewAccounting)]
 [Route("api/v1/accounting")]
-public class AccountingReportsController(IAccountingService svc, IAuthorizationService auth) : ControllerBase
+public class AccountingReportsController(IAccountingService svc, IRevaluationService reval, IAuthorizationService auth) : ControllerBase
 {
+    [HttpGet("revaluation/preview")]
+    public async Task<IActionResult> RevaluationPreview([FromQuery] DateOnly asOf, CancellationToken ct) =>
+        Ok(ApiResponse.Ok(await reval.PreviewAsync(asOf, ct)));
+
+    [HttpGet("revaluation/runs")]
+    public async Task<IActionResult> RevaluationRuns(CancellationToken ct) => Ok(ApiResponse.Ok(await reval.ListAsync(ct)));
+
+    [HttpPost("revaluation")]
+    public async Task<IActionResult> Revalue([FromBody] RevaluationInput input, CancellationToken ct) =>
+        !(await auth.AuthorizeAsync(User, Policies.ManageAccounting)).Succeeded ? Forbid() : Ok(ApiResponse.Ok(await reval.RunAsync(input.AsOf, ct)));
+
     [HttpGet("trial-balance")]
     public async Task<IActionResult> TrialBalance([FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken ct) =>
         Ok(ApiResponse.Ok(await svc.GetTrialBalanceAsync(from, to, ct)));

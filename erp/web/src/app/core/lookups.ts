@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Api } from './api';
 import { I18n } from './i18n';
-import { LookupCurrency, LookupCustomer, LookupDriver, LookupItem, LookupSupplier, LookupVehicle, LookupWarehouse } from './models';
+import { AccountDto, LookupCurrency, LookupCustomer, LookupDriver, LookupItem, LookupSupplier, LookupVehicle, LookupWarehouse } from './models';
 
 /** Cached reference data, used to label ids and fill selects on inventory and purchasing screens. */
 @Injectable({ providedIn: 'root' })
@@ -16,6 +16,7 @@ export class Lookups {
   readonly customers = signal<LookupCustomer[]>([]);
   readonly drivers = signal<LookupDriver[]>([]);
   readonly vehicles = signal<LookupVehicle[]>([]);
+  readonly accounts = signal<AccountDto[]>([]);
   readonly activeItems = computed(() => this.items().filter((i) => i.isActive));
   readonly activeWarehouses = computed(() => this.warehouses().filter((w) => w.isActive));
   readonly activeSuppliers = computed(() => this.suppliers().filter((s) => s.isActive));
@@ -37,6 +38,7 @@ export class Lookups {
     this.api.list<LookupCustomer>('customers', { pageSize: 500 }).subscribe((r) => this.customers.set(r.items));
     this.api.list<LookupDriver>('drivers', { pageSize: 500 }).subscribe((r) => this.drivers.set(r.items));
     this.api.list<LookupVehicle>('vehicles', { pageSize: 500 }).subscribe((r) => this.vehicles.set(r.items));
+    this.api.list<AccountDto>('accounts', { pageSize: 500, postableOnly: true }).subscribe((r) => this.accounts.set(r.items));
   }
 
   itemLabel(id: number | null | undefined): string {
@@ -70,6 +72,11 @@ export class Lookups {
 
   currencyLabel(id: number | null | undefined): string {
     return this.currencies().find((x) => x.id === id)?.code ?? (id ? String(id) : '');
+  }
+
+  accountLabel(id: number | null | undefined): string {
+    const a = this.accounts().find((x) => x.id === id);
+    return a ? `${a.code} — ${this.i18n.name(a)}` : id ? String(id) : '';
   }
 
   isLocalCurrency(id: number | null | undefined): boolean {

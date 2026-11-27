@@ -192,6 +192,8 @@ tr.clickable { cursor: pointer; }
 .table tfoot th { background: var(--surface-2); border-top: 1px solid var(--border); }
 .add-stop { display: flex; gap: .5rem; align-items: center; .input { flex: 1; } }
 
+.alloc-bar { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: .5rem 0 1rem; }
+
 // ---------- accounting ----------
 .alert.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); background: color-mix(in srgb, var(--ok) 8%, transparent); }
 .statement h3 { margin: 1rem 0 .4rem; font-size: .95rem; color: var(--muted); &:first-child { margin-top: 0; } }

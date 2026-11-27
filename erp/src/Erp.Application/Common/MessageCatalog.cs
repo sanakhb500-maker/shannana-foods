@@ -152,6 +152,25 @@ public static class MessageCatalog
         ("Stop results can only be recorded while the trip is in transit.", "لا تُسجَّل نتائج المحطات إلا والرحلة في الطريق."),
         ("A delivery note may appear only once per trip.", "لا يجوز تكرار سند التسليم في الرحلة الواحدة."),
 
+        // ----- allocations, expenses, revaluation -----
+        ("Allocation amounts must be greater than zero.", "يجب أن تكون مبالغ التخصيص أكبر من صفر."),
+        ("The allocations exceed the payment amount.", "مجموع التخصيصات يتجاوز مبلغ الدفعة."),
+        ("An invoice may appear only once among the allocations.", "لا يجوز تكرار الفاتورة ضمن التخصيصات."),
+        ("An allocated invoice does not exist.", "إحدى الفواتير المخصَّص لها غير موجودة."),
+        ("Invoice {number} is not confirmed, so it cannot be paid yet.", "الفاتورة {number} غير معتمدة، فلا يمكن سدادها بعد."),
+        ("Invoice {number} belongs to another supplier.", "الفاتورة {number} تخص مورّدًا آخر."),
+        ("Invoice {number} belongs to another customer.", "الفاتورة {number} تخص عميلًا آخر."),
+        ("Invoice {number} is in a different currency from the payment.", "الفاتورة {number} بعملة تختلف عن عملة الدفعة."),
+        ("The allocation to invoice {number} exceeds its outstanding amount ({amount}).", "التخصيص للفاتورة {number} يتجاوز المبلغ المستحق عليها ({amount})."),
+        ("A receipt can only be allocated to sales invoices.", "يمكن تخصيص سند القبض لفواتير المبيعات فقط."),
+        ("Payments are already allocated to this invoice. Cancel them first.", "توجد دفعات مخصَّصة لهذه الفاتورة. ألغِها أولًا."),
+        ("An expense line uses an inactive or header account.", "أحد بنود المصروف يستخدم حسابًا معطّلًا أو رئيسيًا."),
+        ("Expense lines must use an expense account.", "يجب أن تستخدم بنود المصروف حساب مصروفات."),
+        ("Expense invoice not found.", "فاتورة المصروفات غير موجودة."),
+        ("Expense voucher not found.", "سند المصروف غير موجود."),
+        ("A revaluation for that date already exists.", "توجد إعادة تقييم لهذا التاريخ مسبقًا."),
+        ("Nothing to revalue: no open foreign-currency invoice differs from the closing rate.", "لا شيء لإعادة تقييمه: لا توجد فاتورة مفتوحة بعملة أجنبية يختلف سعرها عن سعر الإقفال."),
+
         // ----- accounting -----
         ("Due date cannot be before the invoice date.", "تاريخ الاستحقاق لا يسبق تاريخ الفاتورة."),
         ("Expected date cannot be before the order date.", "التاريخ المتوقع لا يسبق تاريخ الأمر."),

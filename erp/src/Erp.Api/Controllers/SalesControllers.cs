@@ -288,6 +288,13 @@ public class SalesReportsController(ISalesService svc) : ControllerBase
     public async Task<IActionResult> Statement([FromQuery] int customerId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken ct) =>
         Ok(ApiResponse.Ok(await svc.GetStatementAsync(customerId, from, to, ct)));
 
+    [HttpGet("open-invoices")]
+    public async Task<IActionResult> OpenInvoices([FromQuery] int? customerId, CancellationToken ct) =>
+        Ok(ApiResponse.Ok(await svc.GetOpenInvoicesAsync(customerId, ct)));
+
+    [HttpGet("ageing")]
+    public async Task<IActionResult> Ageing(CancellationToken ct) => Ok(ApiResponse.Ok(await svc.GetAgeingAsync(ct)));
+
     [HttpGet("customer-balances")]
     public async Task<IActionResult> Balances(CancellationToken ct) => Ok(ApiResponse.Ok(await svc.GetCustomerBalancesAsync(ct)));
 }
