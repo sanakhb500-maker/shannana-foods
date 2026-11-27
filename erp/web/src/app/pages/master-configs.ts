@@ -15,7 +15,7 @@ const currencyOpt = (nullable = true): Field => ({
 export const MASTER_CONFIGS: Record<string, CrudConfig> = {
   items: {
     title: 'nav.items', endpoint: 'items', writeRoles: WRITE_ROLES.items,
-    defaults: { costPrice: 0, salePrice: 0, reorderLevel: 0 },
+    defaults: { costPrice: 0, salePrice: 0, distributorPrice: null, weightKg: 0, reorderLevel: 0 },
     fields: [
       code, nameAr, nameEn,
       { key: 'unitId', label: 'f.unit', type: 'select', lookup: 'units', required: true },
@@ -23,6 +23,8 @@ export const MASTER_CONFIGS: Record<string, CrudConfig> = {
       { key: 'barcode', label: 'f.barcode', type: 'text', maxlength: 50, noColumn: true },
       { key: 'costPrice', label: 'f.costPrice', type: 'number', step: '0.0001' },
       { key: 'salePrice', label: 'f.salePrice', type: 'number', step: '0.0001' },
+      { key: 'distributorPrice', label: 'f.distributorPrice', type: 'number', step: '0.0001', nullable: true, noColumn: true },
+      { key: 'weightKg', label: 'f.weightKg', type: 'number', step: '0.0001', noColumn: true },
       { key: 'reorderLevel', label: 'f.reorderLevel', type: 'number', step: '0.0001', noColumn: true },
     ],
   },

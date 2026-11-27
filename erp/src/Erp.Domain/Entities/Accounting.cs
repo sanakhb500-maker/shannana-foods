@@ -79,6 +79,8 @@ public static class AccountRoles
     public const string OpeningEquity = "OpeningEquity";
     public const string SalesRevenue = "SalesRevenue";
     public const string SalesReturns = "SalesReturns";
+    /// <summary>Contra-revenue: discounts given to customers (line and invoice discounts).</summary>
+    public const string SalesDiscounts = "SalesDiscounts";
     public const string CostOfGoodsSold = "COGS";
     public const string InventoryAdjustments = "InventoryAdjustments";
     public const string ExchangeGain = "ExchangeGain";
@@ -87,7 +89,7 @@ public static class AccountRoles
     public static readonly string[] All =
     [
         Cash, Bank, Receivables, Inventory, Payables, GoodsReceivedNotInvoiced, OpeningEquity,
-        SalesRevenue, SalesReturns, CostOfGoodsSold, InventoryAdjustments, ExchangeGain, ExchangeLoss,
+        SalesRevenue, SalesReturns, SalesDiscounts, CostOfGoodsSold, InventoryAdjustments, ExchangeGain, ExchangeLoss,
     ];
 }
 

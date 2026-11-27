@@ -79,7 +79,7 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 - **Customer account** (statement / balances): invoices raise what the customer owes; returns and receipts lower it. Receipts are on account.
 - **Trips:** a trip = driver + vehicle + ordered stops (delivery notes). Planned (editable) -> In transit (needs every delivery confirmed; record Delivered/Failed per stop) -> Completed (no Pending stops). One driver / one vehicle per day. A delivery can be on one live trip at a time; a **delivered** stop is final, a **failed** one can be planned again. When a trip is **completed**, the delivery note of every *failed* stop is cancelled automatically (goods back in stock, GL reversed), in the same transaction; if that delivery cannot be cancelled (e.g. it is already invoiced) completion is refused with the reason. Cancelled deliveries do not return to the unassigned pool.
 - **Access:** reading sales data needs Admin, Accountant, Sales, Dispatcher or StoreKeeper (Purchasing gets 403). Writing: orders and invoices - Admin/Sales; deliveries and returns - Admin/Sales/StoreKeeper; trips - Admin/Dispatcher; customer receipts - Admin/Accountant.
-- **Not in this phase:** tax, price lists/discounts, vehicle capacity checks (items have no weight yet).
+- **Not in this phase:** tax (undecided). Price lists, discounts and the capacity check are described under *Pricing, discounts and load*.
 
 ## Accounting rules (phase 5)
 - **Double entry, local currency.** Every journal line is a debit or a credit (never both, never negative) in LOCAL currency; each entry balances to the unit. Documents carry their own exchange-rate snapshot, so foreign-currency documents post at that rate. Foreign-currency revaluation and exchange differences are not modelled.
@@ -91,7 +91,7 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 | Purchase invoice confirmed | GRNI | Payables (supplier) |
 | Supplier payment confirmed | Payables (supplier) | Cash (cash payments) or Bank (transfer / cheque) |
 | Delivery note confirmed | Cost of goods sold | Inventory |
-| Sales invoice confirmed | Receivables (customer) | Sales revenue |
+| Sales invoice confirmed | Receivables (net) + Sales discounts given (4250) | Sales revenue (at the undiscounted value) |
 | Sales return confirmed | Sales returns (contra revenue) + Inventory | Receivables (customer) + Cost of goods sold |
 | Customer receipt confirmed | Cash / Bank | Receivables (customer) |
 | Purchase return confirmed | Payables (supplier) | Inventory (at average cost) + GRNI for any price/cost difference |
@@ -123,6 +123,11 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 JWT in an HttpOnly cookie (`erp_auth`) plus a double-submit CSRF token (`erp_csrf` cookie echoed in `X-CSRF-Token`) on writes.
 Roles: Admin, Accountant, StoreKeeper, Purchasing, Sales, Dispatcher. Everyone signed in can read master data; writes are limited per area
 (see `Erp.Domain/Common/Roles.cs`, mirrored for the UI in `web/src/app/core/models.ts`). Deactivated users lose access immediately.
+
+## Pricing, discounts and load
+- **Two price lists** per item: *Sale price* (retail) and an optional *Distributor price* (local currency). When a sales document is typed, the unit price is suggested from the list matching the customer's type (distributor price for Distributor customers that the item has one for, retail otherwise), converted to the document currency; it is only a suggestion and can be edited.
+- **Discounts.** Sales order and sales invoice lines have a *discount %* (0-100). A sales invoice also has an *invoice discount* amount, deducted from the sum of the discounted lines (it cannot exceed it). The invoice total, receivable, credit-limit check, statements and ageing all use the net amount. Posting: Dr Receivables (net) + Dr *Sales discounts given* (new contra-revenue account 4250, created automatically on older databases) / Cr Sales revenue at the undiscounted value, so the books show how much was given away. Delivery notes carry no discount (they only move goods). A return linked to a discounted invoice is pre-filled at the net unit price.
+- **Vehicle load.** Items have a *weight (kg per unit)*. A trip shows the total weight of its live (not cancelled) deliveries against the vehicle's capacity and warns when it is exceeded, and when some goods have no recorded weight. It is a warning only; nothing is blocked.
 
 ## Returns
 - **Purchase returns** (`PRT-` numbers): confirming takes the goods out of the warehouse at its average cost and lowers what we owe the supplier (Dr Payables at the return price, Cr Inventory at cost, difference to *Goods received not invoiced*). Cancelling reverses both. Supplier statement/balances show them; the Payables reconciliation counts them.

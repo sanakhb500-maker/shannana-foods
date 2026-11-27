@@ -46,7 +46,12 @@ public class Item : AuditableEntity
     public string? Barcode { get; set; }
     /// <summary>Standard/initial cost in local currency (moving-average cost is computed in the inventory phase).</summary>
     public decimal CostPrice { get; set; }
+    /// <summary>Retail price list (local currency).</summary>
     public decimal SalePrice { get; set; }
+    /// <summary>Distributor price list (local currency). Empty = distributors pay the retail price.</summary>
+    public decimal? DistributorPrice { get; set; }
+    /// <summary>Weight of one unit in kg, used to check a trip against the vehicle's capacity (0 = unknown).</summary>
+    public decimal WeightKg { get; set; }
     public decimal ReorderLevel { get; set; }
 }
 

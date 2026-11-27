@@ -5,7 +5,8 @@ using Erp.Domain.Entities;
 namespace Erp.Application.Sales;
 
 // ---------- inputs ----------
-public sealed record SoLineInput(int ItemId, decimal Quantity, decimal UnitPrice);
+/// <param name="DiscountPercent">Line discount, 0-100.</param>
+public sealed record SoLineInput(int ItemId, decimal Quantity, decimal UnitPrice, decimal DiscountPercent = 0);
 
 /// <param name="ExchangeRate">Local units per 1 unit of the document currency. Empty = latest stored rate on/before the date (1 for the local currency).</param>
 public sealed record SalesOrderInput(DateOnly Date, DateOnly? RequiredDate, int CustomerId, int CurrencyId, decimal? ExchangeRate,
@@ -16,10 +17,11 @@ public sealed record DeliveryLineInput(int? SalesOrderLineId, int ItemId, decima
 public sealed record DeliveryNoteInput(DateOnly Date, int CustomerId, int WarehouseId, int? SalesOrderId, int CurrencyId, decimal? ExchangeRate,
     string? Notes, List<DeliveryLineInput> Lines);
 
-public sealed record SalesInvoiceLineInput(int? SalesOrderLineId, int ItemId, decimal Quantity, decimal UnitPrice);
+public sealed record SalesInvoiceLineInput(int? SalesOrderLineId, int ItemId, decimal Quantity, decimal UnitPrice, decimal DiscountPercent = 0);
 
+/// <param name="DiscountAmount">Invoice-level discount in document currency, deducted from the sum of the discounted lines.</param>
 public sealed record SalesInvoiceInput(DateOnly Date, DateOnly? DueDate, int CustomerId, int? SalesOrderId, int CurrencyId, decimal? ExchangeRate,
-    string? Notes, List<SalesInvoiceLineInput> Lines);
+    string? Notes, List<SalesInvoiceLineInput> Lines, decimal DiscountAmount = 0);
 
 public sealed record ReturnLineInput(int ItemId, decimal Quantity, decimal UnitPrice);
 
@@ -60,8 +62,13 @@ public sealed record TripRow(int Id, string? Number, DateOnly Date, int DriverId
 public sealed record StopView(int Id, int Sequence, StopStatus Status, string? Notes, int DeliveryNoteId, string? DeliveryNumber,
     int CustomerId, int WarehouseId, int CurrencyId, decimal TotalAmount, DocumentStatus DeliveryStatus);
 
+/// <param name="TotalWeightKg">Weight of the goods on the trip's live deliveries (quantity x item weight).</param>
+/// <param name="CapacityKg">The vehicle's capacity (0 = not set).</param>
+/// <param name="OverCapacity">A warning, not a block: the load exceeds the vehicle's capacity.</param>
+/// <param name="LinesWithoutWeight">Delivery lines whose item has no weight, so the total may be understated.</param>
 public sealed record TripDetail(int Id, string? Number, DateOnly Date, int DriverId, int VehicleId, TripStatus Status, string? Notes,
-    DateTime? StartedAt, DateTime? CompletedAt, IReadOnlyList<StopView> Stops);
+    DateTime? StartedAt, DateTime? CompletedAt, IReadOnlyList<StopView> Stops,
+    decimal TotalWeightKg = 0, decimal CapacityKg = 0, bool OverCapacity = false, int LinesWithoutWeight = 0);
 
 public sealed record CustomerStatementRow(DateOnly Date, string Type, string? Number, string? Reference, int CurrencyId, decimal Amount,
     decimal ExchangeRate, decimal Debit, decimal Credit, decimal Balance);

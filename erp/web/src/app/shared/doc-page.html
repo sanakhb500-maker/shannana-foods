@@ -202,7 +202,7 @@
                       }
                     }
                   }
-                  @if (cfg.lineKind !== 'expense') { <td class="num">{{ (l['quantity'] || 0) * (l['unitPrice'] || 0) | number: '1.2-4' }}</td> }
+                  @if (cfg.lineKind !== 'expense') { <td class="num">{{ lineTotal(l) | number: '1.2-4' }}</td> }
                   @if (editable()) {
                     <td class="actions"><button class="btn sm danger" type="button" (click)="removeLine(i)" [attr.aria-label]="i18n.t('common.remove')">✕</button></td>
                   }

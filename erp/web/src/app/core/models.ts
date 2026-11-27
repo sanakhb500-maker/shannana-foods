@@ -59,7 +59,7 @@ export const WRITE_ROLES = {
 export type DocStatus = 'Draft' | 'Confirmed' | 'Cancelled';
 export type AdjustmentReason = 'Count' | 'Opening' | 'Damage' | 'Other';
 
-export interface LookupItem { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean; reorderLevel?: number; salePrice?: number }
+export interface LookupItem { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean; reorderLevel?: number; salePrice?: number; distributorPrice?: number | null; weightKg?: number }
 export interface LookupWarehouse { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean }
 
 export interface BalanceRow {
@@ -96,7 +96,7 @@ export interface StatementRow { date: string; type: 'Invoice' | 'Return' | 'Paym
 export interface SupplierStatement { supplierId: number; from: string | null; to: string | null; openingBalance: number; rows: StatementRow[]; totalInvoiced: number; totalPaid: number; closingBalance: number }
 
 // ---------- sales and distribution ----------
-export interface LookupCustomer { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean; currencyId?: number | null; creditLimit?: number }
+export interface LookupCustomer { id: number; code: string; nameAr: string; nameEn: string; isActive: boolean; currencyId?: number | null; creditLimit?: number; type?: string }
 export interface LookupDriver { id: number; name: string; isActive: boolean }
 export interface LookupVehicle { id: number; plateNumber: string; description?: string | null; isActive: boolean }
 
@@ -105,7 +105,7 @@ export type StopStatus = 'Pending' | 'Delivered' | 'Failed';
 
 export interface TripRow { id: number; number: string | null; date: string; driverId: number; vehicleId: number; status: TripStatus; stopCount: number; deliveredCount: number }
 export interface TripStop { id?: number; sequence: number; status: StopStatus; notes: string | null; deliveryNoteId: number; deliveryNumber: string | null; customerId: number; totalAmount: number; currencyId: number; deliveryStatus: DocStatus }
-export interface Trip { id?: number; number?: string | null; date: string; driverId: number | null; vehicleId: number | null; status: TripStatus; notes: string | null; startedAt?: string | null; completedAt?: string | null; stops: TripStop[] }
+export interface Trip { id?: number; number?: string | null; date: string; driverId: number | null; vehicleId: number | null; status: TripStatus; notes: string | null; startedAt?: string | null; completedAt?: string | null; stops: TripStop[]; totalWeightKg?: number; capacityKg?: number; overCapacity?: boolean; linesWithoutWeight?: number }
 export interface DeliveryRow { id: number; number: string | null; customerId: number; totalAmount: number; currencyId: number; status: DocStatus; tripNumber: string | null }
 
 export interface CustomerBalanceRow { customerId: number; code: string; nameAr: string; nameEn: string; invoiced: number; returned: number; received: number; balance: number; creditLimit: number }

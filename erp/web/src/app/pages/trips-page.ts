@@ -181,6 +181,16 @@ const today = () => new Date().toISOString().slice(0, 10);
             </table>
           </div>
 
+          @if (t.id && t.capacityKg) {
+            <p class="hint-text">{{ i18n.t('trip.load') }}: {{ t.totalWeightKg | number: '1.0-2' }} / {{ t.capacityKg | number: '1.0-2' }} {{ i18n.t('common.kg') }}</p>
+          }
+          @if (t.overCapacity) {
+            <div class="alert warn">{{ i18n.t('trip.overCapacity') }}</div>
+          }
+          @if (t.linesWithoutWeight) {
+            <p class="hint-text">{{ i18n.t('trip.noWeight') }} {{ t.linesWithoutWeight }}</p>
+          }
+
           @if (editable()) {
             <div class="add-stop">
               <select class="input" name="addStop" [(ngModel)]="addId">

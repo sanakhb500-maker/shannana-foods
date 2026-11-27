@@ -110,7 +110,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         ?? throw new NotFoundException("Sales order not found.");
 
     private static List<SalesOrderLine> OrderLines(IEnumerable<SoLineInput> lines) =>
-        lines.Select(l => new SalesOrderLine { ItemId = l.ItemId, Quantity = l.Quantity, UnitPrice = l.UnitPrice }).ToList();
+        lines.Select(l => new SalesOrderLine { ItemId = l.ItemId, Quantity = l.Quantity, UnitPrice = l.UnitPrice, DiscountPercent = l.DiscountPercent }).ToList();
 
     public async Task<SalesOrder> CreateOrderAsync(SalesOrderInput i, CancellationToken ct)
     {
@@ -122,7 +122,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         {
             Date = i.Date, RequiredDate = i.RequiredDate, CustomerId = i.CustomerId, CurrencyId = i.CurrencyId, ExchangeRate = rate,
             Notes = Clean(i.Notes), Status = DocumentStatus.Draft, Lines = OrderLines(i.Lines),
-            TotalAmount = i.Lines.Sum(l => R4(l.Quantity * l.UnitPrice)),
+            TotalAmount = i.Lines.Sum(l => LineNet(l.Quantity, l.UnitPrice, l.DiscountPercent)),
         };
         db.SalesOrders.Add(so);
         await SaveAsync(ct);
@@ -141,7 +141,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         so.ExchangeRate = rate; so.Notes = Clean(i.Notes);
         db.SalesOrderLines.RemoveRange(so.Lines);
         so.Lines = OrderLines(i.Lines);
-        so.TotalAmount = i.Lines.Sum(l => R4(l.Quantity * l.UnitPrice));
+        so.TotalAmount = i.Lines.Sum(l => LineNet(l.Quantity, l.UnitPrice, l.DiscountPercent));
         await SaveAsync(ct);
         return so;
     }
@@ -373,7 +373,15 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         ?? throw new NotFoundException("Sales invoice not found.");
 
     private static List<SalesInvoiceLine> InvoiceLines(IEnumerable<SalesInvoiceLineInput> lines) =>
-        lines.Select(l => new SalesInvoiceLine { SalesOrderLineId = l.SalesOrderLineId, ItemId = l.ItemId, Quantity = l.Quantity, UnitPrice = l.UnitPrice }).ToList();
+        lines.Select(l => new SalesInvoiceLine { SalesOrderLineId = l.SalesOrderLineId, ItemId = l.ItemId, Quantity = l.Quantity, UnitPrice = l.UnitPrice, DiscountPercent = l.DiscountPercent }).ToList();
+
+    /// <summary>Sum of the discounted lines minus the invoice-level discount, which may not exceed that sum.</summary>
+    private static decimal InvoiceTotal(SalesInvoiceInput i)
+    {
+        var subtotal = i.Lines.Sum(l => LineNet(l.Quantity, l.UnitPrice, l.DiscountPercent));
+        if (R4(i.DiscountAmount) > subtotal) throw new BusinessRuleException("The invoice discount cannot exceed the sum of the lines.");
+        return subtotal - R4(i.DiscountAmount);
+    }
 
     private async Task ValidateInvoiceAsync(SalesInvoiceInput i, CancellationToken ct)
     {
@@ -392,7 +400,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         {
             Date = i.Date, DueDate = i.DueDate, CustomerId = i.CustomerId, SalesOrderId = i.SalesOrderId, CurrencyId = i.CurrencyId,
             ExchangeRate = rate, Notes = Clean(i.Notes), Status = DocumentStatus.Draft, Lines = InvoiceLines(i.Lines),
-            TotalAmount = i.Lines.Sum(l => R4(l.Quantity * l.UnitPrice)),
+            DiscountAmount = R4(i.DiscountAmount), TotalAmount = InvoiceTotal(i),
         };
         db.SalesInvoices.Add(inv);
         await SaveAsync(ct);
@@ -412,7 +420,8 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         inv.CurrencyId = i.CurrencyId; inv.ExchangeRate = rate; inv.Notes = Clean(i.Notes);
         db.SalesInvoiceLines.RemoveRange(inv.Lines);
         inv.Lines = InvoiceLines(i.Lines);
-        inv.TotalAmount = i.Lines.Sum(l => R4(l.Quantity * l.UnitPrice));
+        inv.DiscountAmount = R4(i.DiscountAmount);
+        inv.TotalAmount = InvoiceTotal(i);
         await SaveAsync(ct);
         return inv;
     }
@@ -454,10 +463,14 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
                     $"Credit limit exceeded: limit {customer.CreditLimit:0.##}, current balance {balance:0.##}, this invoice {thisInvoice:0.##} (local currency).");
         }
 
+        // Revenue is booked at the undiscounted value and the discounts given go to their own contra account, so the books show how much was discounted.
         var receivable = R4(inv.TotalAmount * inv.ExchangeRate);
+        var revenue = R4(inv.Lines.Sum(l => LineGross(l.Quantity, l.UnitPrice)) * inv.ExchangeRate);
+        var discounts = revenue - receivable;
         await gl.PostAsync(SourceTypes.SalesInvoice, inv.Id, inv.Date, $"Sales invoice {inv.Number}", ct,
             new PostLine(AccountRoles.Receivables, receivable, 0, PartyType.Customer, inv.CustomerId),
-            new PostLine(AccountRoles.SalesRevenue, 0, receivable));
+            new PostLine(AccountRoles.SalesDiscounts, discounts, 0),
+            new PostLine(AccountRoles.SalesRevenue, 0, revenue));
 
         inv.Status = DocumentStatus.Confirmed;
         inv.ConfirmedAt = DateTime.UtcNow;
@@ -808,7 +821,16 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
             var d = deliveries[s.DeliveryNoteId];
             return new StopView(s.Id, s.Sequence, s.Status, s.Notes, s.DeliveryNoteId, d.Number, d.CustomerId, d.WarehouseId, d.CurrencyId, d.TotalAmount, d.Status);
         }).ToList();
-        return new TripDetail(t.Id, t.Number, t.Date, t.DriverId, t.VehicleId, t.Status, t.Notes, t.StartedAt, t.CompletedAt, stops);
+        // Load check: weight of the goods on live (not cancelled) deliveries against the vehicle's capacity. Only a warning.
+        var load = await (from l in db.DeliveryNoteLines
+                          join d in db.DeliveryNotes on l.DeliveryNoteId equals d.Id
+                          join it in db.Items on l.ItemId equals it.Id
+                          where ids.Contains(d.Id) && d.Status != DocumentStatus.Cancelled
+                          select new { l.Quantity, it.WeightKg }).AsNoTracking().ToListAsync(ct);
+        var weight = load.Sum(x => x.Quantity * x.WeightKg);
+        var capacity = await db.Vehicles.AsNoTracking().Where(v => v.Id == t.VehicleId).Select(v => v.CapacityKg).FirstOrDefaultAsync(ct);
+        return new TripDetail(t.Id, t.Number, t.Date, t.DriverId, t.VehicleId, t.Status, t.Notes, t.StartedAt, t.CompletedAt, stops,
+            weight, capacity, capacity > 0 && weight > capacity, load.Count(x => x.WeightKg == 0));
     }
 
     public async Task<TripDetail> GetTripAsync(int id, CancellationToken ct) => await DetailAsync(await LoadTripAsync(id, ct), ct);

@@ -52,6 +52,8 @@ public class ItemValidator : AbstractValidator<Item>
         RuleFor(x => x.UnitId).GreaterThan(0);
         RuleFor(x => x.CostPrice).GreaterThanOrEqualTo(0);
         RuleFor(x => x.SalePrice).GreaterThanOrEqualTo(0);
+        RuleFor(x => x.DistributorPrice).GreaterThanOrEqualTo(0).When(x => x.DistributorPrice.HasValue);
+        RuleFor(x => x.WeightKg).GreaterThanOrEqualTo(0);
         RuleFor(x => x.ReorderLevel).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Barcode).MaximumLength(50);
     }

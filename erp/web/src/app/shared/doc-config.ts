@@ -45,6 +45,8 @@ export interface OrderLinkConfig {
   lineKey?: 'purchaseOrderLineId' | 'salesOrderLineId';
   /** Quantity still to process on an order line, for pre-filling a new document from the order. */
   remaining: (orderLine: Record<string, any>) => number;
+  /** Unit price to pre-fill from a linked document line (defaults to its unit price). */
+  price?: (line: Record<string, any>) => number;
 }
 
 /** A button on a confirmed order that starts a follow-on document pre-filled from it. */
@@ -76,8 +78,12 @@ export interface DocConfig {
   listCols: ListCol[];
   order?: OrderLinkConfig;
   shortcuts?: Shortcut[];
-  /** Selling documents default the line price from the item's sale price. */
+  /** Selling documents default the line price from the item's price list (retail, or distributor for distributor customers). */
   priceFromItem?: boolean;
+  /** Lines carry a discount % column. */
+  lineDiscount?: boolean;
+  /** The document has an invoice-level discount amount (discountAmount). */
+  headerDiscount?: boolean;
   /** Document-specific initial values and request fields. */
   blankExtras?: () => Record<string, unknown>;
   bodyExtras?: (doc: Record<string, any>) => Record<string, unknown>;
@@ -101,7 +107,11 @@ const salesLink: OrderLinkConfig = {
 };
 
 const purchaseInvoiceLink: OrderLinkConfig = { endpoint: 'purchaseinvoices', idKey: 'purchaseInvoiceId', remaining: (l) => l['quantity'] };
-const salesInvoiceLink: OrderLinkConfig = { endpoint: 'salesinvoices', idKey: 'salesInvoiceId', remaining: (l) => l['quantity'] };
+// a return of discounted goods credits what the customer actually paid per unit
+const salesInvoiceLink: OrderLinkConfig = {
+  endpoint: 'salesinvoices', idKey: 'salesInvoiceId', remaining: (l) => l['quantity'],
+  price: (l) => Math.round(l['unitPrice'] * (1 - (l['discountPercent'] ?? 0) / 100) * 10000) / 10000,
+};
 const purchaseInvoiceField: DocField = { key: 'purchaseInvoiceId', label: 'pur.linkedInvoice', type: 'select', options: 'orders', nullable: true };
 const salesInvoiceField: DocField = { key: 'salesInvoiceId', label: 'sal.linkedInvoice', type: 'select', options: 'orders', nullable: true };
 
@@ -110,6 +120,8 @@ const itemQtyPrice: LineCol[] = [
   { key: 'quantity', label: 'inv.quantity', kind: 'qty' },
   { key: 'unitPrice', label: 'pur.unitPrice', kind: 'price' },
 ];
+
+const discountCol: LineCol = { key: 'discountPercent', label: 'sal.discountPct', kind: 'qty' };
 
 const txt = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
@@ -207,10 +219,10 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
   // ---------------- sales ----------------
   salesOrder: {
     kind: 'salesOrder', title: 'nav.salesOrders', newLabel: 'sal.newOrder', endpoint: 'salesorders', writeRoles: WRITE_ROLES.sales,
-    partyKey: 'customerId', pendingLabel: 'sal.awaitingDelivery', filters: ['party', 'pending'], priceFromItem: true,
+    partyKey: 'customerId', pendingLabel: 'sal.awaitingDelivery', filters: ['party', 'pending'], priceFromItem: true, lineDiscount: true,
     fields: [date, { key: 'requiredDate', label: 'sal.requiredDate', type: 'date' }, customer, currency, rate, notes],
     lineCols: [
-      ...itemQtyPrice,
+      ...itemQtyPrice, discountCol,
       { key: 'deliveredQuantity', label: 'sal.delivered', kind: 'readonly', afterDraft: true },
       { key: 'invoicedQuantity', label: 'pur.invoiced', kind: 'readonly', afterDraft: true },
     ],
@@ -244,13 +256,14 @@ export const DOC_CONFIGS: Record<DocKind, DocConfig> = {
   },
   salesInvoice: {
     kind: 'salesInvoice', title: 'nav.salesInvoices', newLabel: 'sal.newInvoice', endpoint: 'salesinvoices', writeRoles: WRITE_ROLES.sales,
-    partyKey: 'customerId', filters: ['party'], priceFromItem: true,
+    partyKey: 'customerId', filters: ['party'], priceFromItem: true, lineDiscount: true, headerDiscount: true,
     shortcuts: [{ label: 'sal.createReturn', route: '/sales-returns', roles: WRITE_ROLES.deliveries }],
     order: { ...salesLink, remaining: (l) => l['deliveredQuantity'] - l['invoicedQuantity'] },
-    fields: [date, { key: 'dueDate', label: 'pur.dueDate', type: 'date' }, salesOrder, customer, currency, rate, notes],
-    lineCols: itemQtyPrice,
-    blankExtras: () => ({ dueDate: null, salesOrderId: null }),
-    bodyExtras: (d) => ({ dueDate: d['dueDate'] || null, salesOrderId: d['salesOrderId'] ?? null }),
+    fields: [date, { key: 'dueDate', label: 'pur.dueDate', type: 'date' }, salesOrder, customer, currency, rate,
+      { key: 'discountAmount', label: 'sal.invoiceDiscount', type: 'number', step: '0.0001' }, notes],
+    lineCols: [...itemQtyPrice, discountCol],
+    blankExtras: () => ({ dueDate: null, salesOrderId: null, discountAmount: 0 }),
+    bodyExtras: (d) => ({ dueDate: d['dueDate'] || null, salesOrderId: d['salesOrderId'] ?? null, discountAmount: Number(d['discountAmount'] ?? 0) }),
     listCols: [
       { key: 'number', label: 'inv.number', kind: 'text' }, { key: 'date', label: 'f.date', kind: 'date' }, { key: 'dueDate', label: 'pur.dueDate', kind: 'date' },
       { key: 'customerId', label: 'f.customer', kind: 'customer' }, { key: 'totalAmount', label: 'pur.total', kind: 'amount' },

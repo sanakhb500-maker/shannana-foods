@@ -63,6 +63,16 @@ public static class DbSeeder
                 });
         }
 
+        // Accounts added after the first release: make sure databases created earlier get them too.
+        if (!await db.Accounts.AnyAsync(a => a.SystemRole == AccountRoles.SalesDiscounts, ct))
+        {
+            var header = await db.Accounts.FirstOrDefaultAsync(a => a.Type == AccountType.Revenue && a.ParentId == null, ct);
+            var code = "4250";
+            while (await db.Accounts.AnyAsync(a => a.Code == code, ct)) code = (int.Parse(code) + 1).ToString();
+            db.Accounts.Add(new Account { Code = code, NameAr = "خصومات المبيعات الممنوحة", NameEn = "Sales discounts given", Type = AccountType.Revenue,
+                ParentId = header?.Id, IsPostable = true, SystemRole = AccountRoles.SalesDiscounts });
+        }
+
         if (!await db.AccountingSettings.AnyAsync(ct)) db.AccountingSettings.Add(new AccountingSetting());
         await db.SaveChangesAsync(ct);
     }

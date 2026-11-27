@@ -63,7 +63,14 @@ export class DocPage implements OnInit {
   /** A method, not a computed: line values are edited in place, which signals cannot see. */
   docTotal(): number {
     const expense = this.cfg.lineKind === 'expense';
-    return (this.doc()?.lines ?? []).reduce((s, l) => s + (expense ? Number(l['amount'] ?? 0) : Number(l['quantity'] ?? 0) * Number(l['unitPrice'] ?? 0)), 0);
+    const lines = (this.doc()?.lines ?? []).reduce((s, l) => s + (expense ? Number(l['amount'] ?? 0) : this.lineTotal(l)), 0);
+    return this.cfg.headerDiscount ? lines - Number(this.doc()?.['discountAmount'] ?? 0) : lines;
+  }
+
+  /** Quantity x price less the line discount. */
+  lineTotal(l: Record<string, any>): number {
+    const gross = Number(l['quantity'] ?? 0) * Number(l['unitPrice'] ?? 0);
+    return this.cfg.lineDiscount ? gross * (1 - Number(l['discountPercent'] ?? 0) / 100) : gross;
   }
 
   /** The party column key, or '' for documents with none. */
@@ -180,9 +187,13 @@ export class DocPage implements OnInit {
     if (!this.cfg.priceFromItem || line['unitPrice'] !== null && line['unitPrice'] !== undefined && line['unitPrice'] !== '') return;
     const item = this.lookups.items().find((i) => i.id === line['itemId']);
     const d = this.doc();
-    if (!item?.salePrice || !d) return;
+    if (!item || !d) return;
+    // two price lists: distributors get the distributor price when the item has one
+    const distributor = this.lookups.customers().find((c) => c.id === d['customerId'])?.type === 'Distributor';
+    const price = distributor && item.distributorPrice ? item.distributorPrice : item.salePrice;
+    if (!price) return;
     const rate = Number(d['exchangeRate']) > 0 ? Number(d['exchangeRate']) : 1;
-    line['unitPrice'] = Math.round((item.salePrice / rate) * 10000) / 10000;
+    line['unitPrice'] = Math.round((price / rate) * 10000) / 10000;
   }
 
   /** Reacts to header edits: keeps the exchange rate and order options in step. */
@@ -242,7 +253,8 @@ export class DocPage implements OnInit {
         d['currencyId'] = order['currencyId'];
         d['exchangeRate'] = order['exchangeRate'];
         const lines = order.lines
-          .map((l) => ({ ...(link.lineKey ? { [link.lineKey]: l['id'] } : {}), itemId: l['itemId'], quantity: link.remaining(l), unitPrice: l['unitPrice'] }))
+          .map((l) => ({ ...(link.lineKey ? { [link.lineKey]: l['id'] } : {}), itemId: l['itemId'], quantity: link.remaining(l), unitPrice: link.price ? link.price(l) : l['unitPrice'],
+            ...(this.cfg.lineDiscount ? { discountPercent: l['discountPercent'] ?? 0 } : {}) }))
           .filter((l) => (l['quantity'] as number) > 0);
         d.lines = lines;
         this.message.set(lines.length ? '' : this.i18n.t('pur.nothingLeft'));
@@ -260,9 +272,10 @@ export class DocPage implements OnInit {
   // ---------- editor ----------
   private blankLine(): Record<string, any> {
     if (this.cfg.lineKind === 'expense') return { accountId: 0, description: null, amount: null };
+    const extra = this.cfg.lineDiscount ? { discountPercent: 0 } : {};
     return this.lineKey
-      ? { [this.lineKey]: null, itemId: 0, quantity: null, unitPrice: null }
-      : { itemId: 0, quantity: null, unitPrice: null };
+      ? { [this.lineKey]: null, itemId: 0, quantity: null, unitPrice: null, ...extra }
+      : { itemId: 0, quantity: null, unitPrice: null, ...extra };
   }
 
   private blank(): Doc {
@@ -349,6 +362,7 @@ export class DocPage implements OnInit {
         itemId: l['itemId'],
         quantity: Number(l['quantity'] ?? 0),
         unitPrice: Number(l['unitPrice'] ?? 0),
+        ...(this.cfg.lineDiscount ? { discountPercent: Number(l['discountPercent'] ?? 0) } : {}),
       }));
     }
     return b;

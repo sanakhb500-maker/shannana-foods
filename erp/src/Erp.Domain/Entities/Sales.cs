@@ -32,6 +32,8 @@ public class SalesOrderLine
     public int ItemId { get; set; }
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
+    /// <summary>Line discount, 0-100 (% of quantity x price).</summary>
+    public decimal DiscountPercent { get; set; }
     /// <summary>Maintained by confirmed delivery notes.</summary>
     public decimal DeliveredQuantity { get; set; }
     /// <summary>Maintained by confirmed sales invoices.</summary>
@@ -81,6 +83,9 @@ public class SalesInvoice : AuditableEntity
     public decimal ExchangeRate { get; set; } = 1m;
     public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
     public string? Notes { get; set; }
+    /// <summary>Invoice-level discount in document currency, deducted after the (already discounted) lines.</summary>
+    public decimal DiscountAmount { get; set; }
+    /// <summary>Net total after line and invoice discounts.</summary>
     public decimal TotalAmount { get; set; }
     public DateTime? ConfirmedAt { get; set; }
     public string? ConfirmedBy { get; set; }
@@ -95,6 +100,8 @@ public class SalesInvoiceLine
     public int ItemId { get; set; }
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
+    /// <summary>Line discount, 0-100 (% of quantity x price).</summary>
+    public decimal DiscountPercent { get; set; }
 }
 
 /// <summary>Goods a customer sends back. Confirming increases stock and credits the customer's account.</summary>

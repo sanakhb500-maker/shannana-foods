@@ -329,6 +329,7 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
             e.ToTable(t =>
             {
                 t.HasCheckConstraint("CK_SalesOrderLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0");
+                t.HasCheckConstraint("CK_SalesOrderLine_Discount", "[DiscountPercent] >= 0 AND [DiscountPercent] <= 100");
                 t.HasCheckConstraint("CK_SalesOrderLine_Progress", "[DeliveredQuantity] >= 0 AND [InvoicedQuantity] >= 0");
             });
         });
@@ -372,7 +373,11 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
         {
             e.HasOne<Item>().WithMany().HasForeignKey(x => x.ItemId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<SalesOrderLine>().WithMany().HasForeignKey(x => x.SalesOrderLineId).OnDelete(DeleteBehavior.Restrict);
-            e.ToTable(t => t.HasCheckConstraint("CK_SalesInvoiceLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0"));
+            e.ToTable(t =>
+            {
+                t.HasCheckConstraint("CK_SalesInvoiceLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0");
+                t.HasCheckConstraint("CK_SalesInvoiceLine_Discount", "[DiscountPercent] >= 0 AND [DiscountPercent] <= 100");
+            });
         });
 
         b.Entity<SalesReturn>(e =>

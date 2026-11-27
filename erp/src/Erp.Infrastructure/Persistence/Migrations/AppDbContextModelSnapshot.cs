@@ -1028,6 +1028,10 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<decimal?>("DistributorPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
@@ -1057,6 +1061,10 @@ namespace Erp.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("WeightKg")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
 
                     b.HasKey("Id");
 
@@ -1677,6 +1685,10 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("Date")
                         .HasColumnType("date");
 
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<DateOnly?>("DueDate")
                         .HasColumnType("date");
 
@@ -1737,6 +1749,10 @@ namespace Erp.Infrastructure.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<int>("ItemId")
                         .HasColumnType("int");
 
@@ -1764,6 +1780,8 @@ namespace Erp.Infrastructure.Persistence.Migrations
 
                     b.ToTable("SalesInvoiceLines", t =>
                         {
+                            t.HasCheckConstraint("CK_SalesInvoiceLine_Discount", "[DiscountPercent] >= 0 AND [DiscountPercent] <= 100");
+
                             t.HasCheckConstraint("CK_SalesInvoiceLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0");
                         });
                 });
@@ -1856,6 +1874,10 @@ namespace Erp.Infrastructure.Persistence.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<decimal>("DiscountPercent")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<decimal>("InvoicedQuantity")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
@@ -1888,6 +1910,8 @@ namespace Erp.Infrastructure.Persistence.Migrations
 
                     b.ToTable("SalesOrderLines", t =>
                         {
+                            t.HasCheckConstraint("CK_SalesOrderLine_Discount", "[DiscountPercent] >= 0 AND [DiscountPercent] <= 100");
+
                             t.HasCheckConstraint("CK_SalesOrderLine_Progress", "[DeliveredQuantity] >= 0 AND [InvoicedQuantity] >= 0");
 
                             t.HasCheckConstraint("CK_SalesOrderLine_Qty", "[Quantity] > 0 AND [UnitPrice] >= 0");

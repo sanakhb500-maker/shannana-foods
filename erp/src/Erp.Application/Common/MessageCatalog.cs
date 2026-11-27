@@ -106,6 +106,7 @@ public static class MessageCatalog
         ("The currency differs from the invoice's currency.", "العملة تختلف عن عملة الفاتورة."),
         ("Item {code} is not on the linked invoice.", "الصنف {code} غير موجود في الفاتورة المرتبطة."),
         ("Returned quantity for item {code} exceeds what was invoiced and not yet returned ({qty}).", "كمية المرتجع للصنف {code} تتجاوز ما فُوتر ولم يُرجَع بعد ({qty})."),
+        ("The invoice discount cannot exceed the sum of the lines.", "خصم الفاتورة لا يمكن أن يتجاوز مجموع البنود."),
         ("Returns are already linked to this invoice. Cancel them first.", "توجد مرتجعات مرتبطة بهذه الفاتورة. ألغِها أولًا."),
 
         // ----- purchasing -----

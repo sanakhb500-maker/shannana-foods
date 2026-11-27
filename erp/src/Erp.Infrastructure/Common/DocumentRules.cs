@@ -11,6 +11,16 @@ public static class DocumentRules
     /// <summary>Money rounding used everywhere: 4 decimals, halves away from zero (matches SQL ROUND).</summary>
     public static decimal R4(decimal v) => Math.Round(v, 4, MidpointRounding.AwayFromZero);
 
+    /// <summary>Quantity x price before any discount.</summary>
+    public static decimal LineGross(decimal qty, decimal price) => R4(qty * price);
+
+    /// <summary>Quantity x price less the line discount percent.</summary>
+    public static decimal LineNet(decimal qty, decimal price, decimal discountPercent)
+    {
+        var gross = R4(qty * price);
+        return gross - R4(gross * discountPercent / 100m);
+    }
+
     public static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
     public static (int Page, int Size) Paging(int page, int size) => (Math.Max(1, page), Math.Clamp(size, 1, 200));

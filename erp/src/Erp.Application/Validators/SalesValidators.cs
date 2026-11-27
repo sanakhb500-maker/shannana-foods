@@ -22,6 +22,7 @@ public class SalesOrderInputValidator : AbstractValidator<SalesOrderInput>
             l.RuleFor(i => i.ItemId).GreaterThan(0);
             l.RuleFor(i => i.Quantity).GreaterThan(0);
             l.RuleFor(i => i.UnitPrice).GreaterThanOrEqualTo(0);
+            l.RuleFor(i => i.DiscountPercent).InclusiveBetween(0, 100);
         });
     }
 }
@@ -59,6 +60,7 @@ public class SalesInvoiceInputValidator : AbstractValidator<SalesInvoiceInput>
         RuleFor(x => x.CurrencyId).GreaterThan(0);
         RuleFor(x => x.ExchangeRate).GreaterThan(0).When(x => x.ExchangeRate.HasValue);
         RuleFor(x => x.Notes).MaximumLength(500);
+        RuleFor(x => x.DiscountAmount).GreaterThanOrEqualTo(0);
         RuleFor(x => x.Lines).NotEmpty().WithMessage("At least one line is required.");
         RuleFor(x => x.Lines).Must(l => l.Select(i => i.ItemId).Distinct().Count() == l.Count)
             .When(x => x.Lines is not null).WithMessage("An item may appear only once per invoice.");
@@ -67,6 +69,7 @@ public class SalesInvoiceInputValidator : AbstractValidator<SalesInvoiceInput>
             l.RuleFor(i => i.ItemId).GreaterThan(0);
             l.RuleFor(i => i.Quantity).GreaterThan(0);
             l.RuleFor(i => i.UnitPrice).GreaterThanOrEqualTo(0);
+            l.RuleFor(i => i.DiscountPercent).InclusiveBetween(0, 100);
         });
     }
 }
