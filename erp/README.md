@@ -136,6 +136,14 @@ Roles: Admin, Accountant, StoreKeeper, Purchasing, Sales, Dispatcher. Everyone s
 ## Search selects (large lists)
 Item, supplier, customer and warehouse pickers (document headers and lines, transfers, adjustments, statements, stock filters) are **server-side search selects**: type a code or name and the API returns the best 20 matches, so lists with thousands of records work. Records fetched this way are added to the client cache so their labels display correctly; list pages fetch labels for any id outside the cached first 500. Master-data lists (currencies, units, drivers, vehicles, accounts) are still plain dropdowns because they stay small.
 
+## Driver app (mobile)
+Delivery drivers use a mobile app (`erp/mobile`, Flutter) instead of the web ERP.
+- **Accounts:** create a user with the **Driver** role and pick the **driver record** it belongs to (Users screen; one account per driver). A driver-only account is locked to the driver API: every other `/api` call returns 403 and the web login refuses it.
+- **Sign-in:** `POST /api/v1/auth/token` (email + password, same rate limit as the web login) returns a bearer token valid `Jwt:MobileExpiryMinutes` (default 12 h). Bearer calls carry no cookie, so CSRF does not apply.
+- **Driver API** (`/api/v1/driver`, always scoped to the caller's own trips, otherwise 404): `GET trips` (planned / in transit / last 7 days), `GET trips/{id}` (stops with customer name, phone, address, delivery lines, collected money, proofs; load vs vehicle capacity), `POST trips/{id}/start|complete`, `PUT trips/{id}/stops/{stopId}` (Delivered / Failed; Failed needs a reason; optional GPS position), `POST stops/{stopId}/collections` (money collected: creates a **Draft customer receipt** referencing the trip, which the accountant confirms in the normal receipts screen), `POST stops/{stopId}/proof` (multipart `kind` Signature|Photo + `file`; PNG/JPEG only, checked by content, max 3 MB, 5 per stop) and `GET proofs/{id}`. Completing a trip still cancels the deliveries of failed stops and puts the goods back in stock.
+- **Proof files** are stored under `Storage:ProofsPath` (default `App_Data/proofs`, outside `wwwroot`, never served directly); ERP staff open them from the Trips screen (`/api/v1/stopproofs/{id}`, needs sales-view rights).
+- **Development:** CORS for `localhost` origins is enabled only in Development (for the Flutter web preview).
+
 ## Look and feel
 The ERP follows the website's design (`frontend/css/style.css`): cream background, brand red `#a8202c`, olive `#718c3f`, Cairo, 20px cards, pill buttons, a dark ink sidebar with the logo. All colors, radii and shadows are CSS variables at the top of `web/src/styles.scss` (light and dark sets), so a palette change is made in one place.
 

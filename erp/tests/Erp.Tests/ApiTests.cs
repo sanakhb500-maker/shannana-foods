@@ -18,6 +18,7 @@ public class ErpFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development"); // brings dev Jwt key + seeded admin from appsettings.Development.json
+        builder.UseSetting("Storage:ProofsPath", Path.Combine(Path.GetTempPath(), "erp-proofs-" + Guid.NewGuid().ToString("N"))); // proof files of the driver tests
         builder.UseSetting("RateLimit:LoginPermitLimit", "10000"); // every test logs in; the limiter itself is exercised in production only
         builder.ConfigureServices(s =>
         {

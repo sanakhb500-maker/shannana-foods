@@ -59,8 +59,11 @@ public sealed record SalesReturnRow(int Id, string? Number, DateOnly Date, int C
 
 public sealed record TripRow(int Id, string? Number, DateOnly Date, int DriverId, int VehicleId, TripStatus Status, int StopCount, int DeliveredCount);
 
+/// <param name="ProofIds">Signature / photo files recorded by the driver app.</param>
+/// <param name="Collected">Money the driver collected at this stop (draft or confirmed receipts, document currency).</param>
 public sealed record StopView(int Id, int Sequence, StopStatus Status, string? Notes, int DeliveryNoteId, string? DeliveryNumber,
-    int CustomerId, int WarehouseId, int CurrencyId, decimal TotalAmount, DocumentStatus DeliveryStatus);
+    int CustomerId, int WarehouseId, int CurrencyId, decimal TotalAmount, DocumentStatus DeliveryStatus,
+    DateTime? ActionAt = null, decimal Collected = 0, IReadOnlyList<int>? ProofIds = null);
 
 /// <param name="TotalWeightKg">Weight of the goods on the trip's live deliveries (quantity x item weight).</param>
 /// <param name="CapacityKg">The vehicle's capacity (0 = not set).</param>

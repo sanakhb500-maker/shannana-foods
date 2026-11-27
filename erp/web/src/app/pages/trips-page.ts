@@ -166,6 +166,14 @@ const today = () => new Date().toISOString().slice(0, 10);
                         } @else {
                           {{ s.notes }}
                         }
+                        @if (s.collected) {
+                          <div class="muted-text">{{ i18n.t('trip.collected') }}: {{ s.collected | number: '1.2-2' }} {{ lookups.currencyLabel(s.currencyId) }}</div>
+                        }
+                        @if (s.proofIds?.length) {
+                          <div class="muted-text">{{ i18n.t('trip.proof') }}:
+                            @for (pid of s.proofIds; track pid; let k = $index) { <a [href]="'/api/v1/stopproofs/' + pid" target="_blank" rel="noopener">#{{ k + 1 }}</a>&nbsp; }
+                          </div>
+                        }
                       </td>
                     }
                     @if (editable()) {

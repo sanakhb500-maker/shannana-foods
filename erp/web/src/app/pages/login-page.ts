@@ -87,7 +87,15 @@ export class LoginPage {
     this.busy.set(true);
     this.error.set('');
     this.auth.login(this.email, this.password).subscribe({
-      next: () => void this.router.navigateByUrl('/'),
+      next: (r) => {
+        // a driver account belongs to the mobile app: do not let it into this system
+        if (r.data?.roles.length === 1 && r.data.roles[0] === 'Driver') {
+          void this.auth.logout().then(() => this.error.set(this.i18n.t('login.driverOnly')));
+          this.busy.set(false);
+          return;
+        }
+        void this.router.navigateByUrl('/');
+      },
       error: (e) => {
         this.busy.set(false);
         this.error.set(e.status === 429 ? e.error?.message ?? this.i18n.t('common.error') : this.i18n.t('login.failed'));

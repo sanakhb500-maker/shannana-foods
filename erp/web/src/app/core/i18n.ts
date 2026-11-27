@@ -409,6 +409,12 @@ const DICT: Record<string, { ar: string; en: string }> = {
   'role.Purchasing': { ar: 'مشتريات', en: 'Purchasing' },
   'role.Sales': { ar: 'مبيعات', en: 'Sales' },
   'role.Dispatcher': { ar: 'مسؤول توزيع', en: 'Dispatcher' },
+  'role.Driver': { ar: 'سائق (تطبيق الموبايل)', en: 'Driver (mobile app)' },
+  'users.driver': { ar: 'السائق المرتبط بهذا الحساب', en: 'Driver linked to this account' },
+  'users.driverHint': { ar: 'حساب السائق يستخدم تطبيق الموبايل فقط ولا يدخل هذا النظام.', en: 'A driver account only uses the mobile app, not this system.' },
+  'login.driverOnly': { ar: 'هذا الحساب مخصص لتطبيق السائق على الموبايل.', en: 'This account is for the driver mobile app.' },
+  'trip.collected': { ar: 'محصّل', en: 'Collected' },
+  'trip.proof': { ar: 'إثبات', en: 'Proof' },
   // users screen
   'users.reset': { ar: 'إعادة تعيين كلمة المرور', en: 'Reset password' },
   'users.rolesHint': { ar: 'اختر دوراً واحداً على الأقل', en: 'Pick at least one role' },

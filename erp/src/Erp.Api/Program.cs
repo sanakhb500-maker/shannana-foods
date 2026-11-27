@@ -4,6 +4,7 @@ using System.Threading.RateLimiting;
 using Erp.Api.Security;
 using Erp.Application.Accounting;
 using Erp.Application.Common;
+using Erp.Application.DriverApp;
 using Erp.Application.Expenses;
 using Erp.Application.Validators;
 using Erp.Domain.Common;
@@ -13,6 +14,7 @@ using Erp.Application.Sales;
 using Erp.Infrastructure.Accounting;
 using Erp.Infrastructure.Auth;
 using Erp.Infrastructure.Common;
+using Erp.Infrastructure.DriverApp;
 using Erp.Infrastructure.Inventory;
 using Erp.Infrastructure.Identity;
 using Erp.Infrastructure.Expenses;
@@ -48,6 +50,11 @@ builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IPurchasingService, PurchasingService>();
 builder.Services.AddScoped<ISalesService, SalesService>();
+builder.Services.Configure<StorageOptions>(cfg.GetSection(StorageOptions.Section));
+builder.Services.PostConfigure<StorageOptions>(o => o.ProofsPath = Path.GetFullPath(o.ProofsPath, builder.Environment.ContentRootPath));
+builder.Services.AddScoped<IDriverService, DriverService>();
+// The browser preview of the Flutter app (dev only) runs on another localhost port.
+builder.Services.AddCors(o => o.AddPolicy("dev", p => p.SetIsOriginAllowed(origin => Uri.TryCreate(origin, UriKind.Absolute, out var u) && u.IsLoopback).AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddDbContext<AppDbContext>(o => o.UseSqlServer(connectionString));
 
 builder.Services.AddIdentityCore<AppUser>(o =>
@@ -148,8 +155,10 @@ app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseRouting();
+if (app.Environment.IsDevelopment()) app.UseCors("dev");
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<DriverScopeMiddleware>();
 app.UseMiddleware<CsrfMiddleware>();
 app.UseAuthorization();
 

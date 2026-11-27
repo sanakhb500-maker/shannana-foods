@@ -822,10 +822,16 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var ids = t.Stops.Select(s => s.DeliveryNoteId).ToList();
         var deliveries = await db.DeliveryNotes.AsNoTracking().Where(d => ids.Contains(d.Id)).ToDictionaryAsync(d => d.Id, ct);
+        var stopIds = t.Stops.Select(s => s.Id).ToList();
+        var collected = (await db.CustomerReceipts.AsNoTracking().Where(r => r.TripStopId != null && stopIds.Contains(r.TripStopId.Value) && r.Status != DocumentStatus.Cancelled)
+            .Select(r => new { Stop = r.TripStopId!.Value, r.Amount }).ToListAsync(ct)).GroupBy(r => r.Stop).ToDictionary(g => g.Key, g => g.Sum(r => r.Amount));
+        var proofs = (await db.StopProofs.AsNoTracking().Where(p => stopIds.Contains(p.TripStopId)).OrderBy(p => p.Id).Select(p => new { p.TripStopId, p.Id }).ToListAsync(ct))
+            .GroupBy(p => p.TripStopId).ToDictionary(g => g.Key, g => (IReadOnlyList<int>)g.Select(p => p.Id).ToList());
         var stops = t.Stops.OrderBy(s => s.Sequence).Select(s =>
         {
             var d = deliveries[s.DeliveryNoteId];
-            return new StopView(s.Id, s.Sequence, s.Status, s.Notes, s.DeliveryNoteId, d.Number, d.CustomerId, d.WarehouseId, d.CurrencyId, d.TotalAmount, d.Status);
+            return new StopView(s.Id, s.Sequence, s.Status, s.Notes, s.DeliveryNoteId, d.Number, d.CustomerId, d.WarehouseId, d.CurrencyId, d.TotalAmount, d.Status,
+                s.ActionAt, collected.GetValueOrDefault(s.Id), proofs.GetValueOrDefault(s.Id) ?? []);
         }).ToList();
         // Load check: weight of the goods on live (not cancelled) deliveries against the vehicle's capacity. Only a warning.
         var load = await (from l in db.DeliveryNoteLines

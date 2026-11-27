@@ -4,4 +4,6 @@ namespace Erp.Application.Common;
 public interface ICurrentUser
 {
     string? UserName { get; }
+    /// <summary>Identity user id of the caller (null when anonymous).</summary>
+    int? UserId { get; }
 }

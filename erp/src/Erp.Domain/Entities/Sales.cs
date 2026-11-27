@@ -148,6 +148,8 @@ public class CustomerReceipt : AuditableEntity
     public PaymentMethod Method { get; set; } = PaymentMethod.Cash;
     public string? Reference { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Set when a driver collected this money at a trip stop (mobile app).</summary>
+    public int? TripStopId { get; set; }
     public DocumentStatus Status { get; set; } = DocumentStatus.Draft;
     public DateTime? ConfirmedAt { get; set; }
     public string? ConfirmedBy { get; set; }
@@ -179,4 +181,21 @@ public class TripStop
     public int Sequence { get; set; }
     public StopStatus Status { get; set; } = StopStatus.Pending;
     public string? Notes { get; set; }
+    /// <summary>When the result (delivered / failed) was recorded.</summary>
+    public DateTime? ActionAt { get; set; }
+    /// <summary>Where the driver was when recording the result (from the phone, optional).</summary>
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+}
+
+public enum ProofKind { Signature = 1, Photo = 2 }
+
+/// <summary>A customer's signature or a photo taken at a stop as proof of delivery. The file lives on disk (Storage:ProofsPath), only metadata is in the database.</summary>
+public class StopProof : Erp.Domain.Common.AuditableEntity
+{
+    public int TripStopId { get; set; }
+    public ProofKind Kind { get; set; }
+    public string FileName { get; set; } = "";
+    public string ContentType { get; set; } = "";
+    public long SizeBytes { get; set; }
 }

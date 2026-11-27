@@ -4,6 +4,8 @@ using Erp.Application.Common;
 using Erp.Api.Security;
 using Erp.Infrastructure.Auth;
 using Erp.Infrastructure.Identity;
+using Erp.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -16,36 +18,60 @@ public sealed record LoginRequest(string Email, string Password);
 
 public sealed record SessionInfo(int Id, string Email, string FullName, string[] Roles, string CsrfToken);
 
+/// <summary>What the mobile app gets: a bearer token (no cookies, no CSRF) and who it belongs to.</summary>
+public sealed record TokenInfo(string Token, DateTime ExpiresAt, int UserId, string Email, string FullName, string[] Roles, int? DriverId);
+
 [ApiController]
 [Route("api/v1/auth")]
-public class AuthController(UserManager<AppUser> users, ITokenService tokens) : ControllerBase
+public class AuthController(UserManager<AppUser> users, ITokenService tokens, AppDbContext db) : ControllerBase
 {
-    [HttpPost("login")]
-    [AllowAnonymous]
-    [EnableRateLimiting("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest req)
+    /// <summary>Checks email + password (with lockout). Returns the user, or the failure response to send back.</summary>
+    private async Task<(AppUser? User, IActionResult? Fail)> CheckCredentialsAsync(LoginRequest? req)
     {
         const string bad = "Invalid email or password.";
         if (string.IsNullOrWhiteSpace(req?.Email) || string.IsNullOrEmpty(req.Password))
-            return BadRequest(ApiResponse.Fail(bad));
+            return (null, BadRequest(ApiResponse.Fail(bad)));
 
         var user = await users.FindByEmailAsync(req.Email.Trim());
         if (user is null)
         {
             // Burn comparable time so unknown emails are not distinguishable by latency.
             users.PasswordHasher.HashPassword(new AppUser(), req.Password);
-            return Unauthorized(ApiResponse.Fail(bad));
+            return (null, Unauthorized(ApiResponse.Fail(bad)));
         }
-        if (!user.IsActive) return Unauthorized(ApiResponse.Fail(bad));
+        if (!user.IsActive) return (null, Unauthorized(ApiResponse.Fail(bad)));
         if (await users.IsLockedOutAsync(user))
-            return StatusCode(StatusCodes.Status429TooManyRequests, ApiResponse.Fail("Account temporarily locked. Try again later."));
+            return (null, StatusCode(StatusCodes.Status429TooManyRequests, ApiResponse.Fail("Account temporarily locked. Try again later.")));
 
         if (!await users.CheckPasswordAsync(user, req.Password))
         {
             await users.AccessFailedAsync(user);
-            return Unauthorized(ApiResponse.Fail(bad));
+            return (null, Unauthorized(ApiResponse.Fail(bad)));
         }
         await users.ResetAccessFailedCountAsync(user);
+        return (user, null);
+    }
+
+    [HttpPost("token")]
+    [AllowAnonymous]
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> Token([FromBody] LoginRequest req)
+    {
+        var (user, fail) = await CheckCredentialsAsync(req);
+        if (user is null) return fail!;
+        var roles = await users.GetRolesAsync(user);
+        var (token, expires) = tokens.Create(user, roles, mobile: true);
+        var driverId = await db.Drivers.AsNoTracking().Where(d => d.UserId == user.Id && d.IsActive).Select(d => (int?)d.Id).FirstOrDefaultAsync();
+        return Ok(ApiResponse.Ok(new TokenInfo(token, expires, user.Id, user.Email!, user.FullName, roles.ToArray(), driverId)));
+    }
+
+    [HttpPost("login")]
+    [AllowAnonymous]
+    [EnableRateLimiting("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest req)
+    {
+        var (user, fail) = await CheckCredentialsAsync(req);
+        if (user is null) return fail!;
 
         var roles = await users.GetRolesAsync(user);
         var (token, expires) = tokens.Create(user, roles);

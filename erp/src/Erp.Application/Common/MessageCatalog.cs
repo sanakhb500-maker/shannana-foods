@@ -64,6 +64,7 @@ public static class MessageCatalog
         ("Purchase return not found.", "مرتجع المشتريات غير موجود."),
         ("Receipt not found.", "سند القبض غير موجود."),
         ("Trip not found.", "الرحلة غير موجودة."),
+        ("Proof not found.", "ملف الإثبات غير موجود."),
         ("Stop not found.", "المحطة غير موجودة."),
         ("Journal entry not found.", "القيد غير موجود."),
 
@@ -107,6 +108,17 @@ public static class MessageCatalog
         ("Item {code} is not on the linked invoice.", "الصنف {code} غير موجود في الفاتورة المرتبطة."),
         ("Returned quantity for item {code} exceeds what was invoiced and not yet returned ({qty}).", "كمية المرتجع للصنف {code} تتجاوز ما فُوتر ولم يُرجَع بعد ({qty})."),
         ("The invoice discount cannot exceed the sum of the lines.", "خصم الفاتورة لا يمكن أن يتجاوز مجموع البنود."),
+        ("No driver is linked to this account.", "لا يوجد سائق مرتبط بهذا الحساب."),
+        ("Only Delivered or Failed can be recorded.", "يمكن تسجيل «تم التسليم» أو «تعذّر» فقط."),
+        ("A reason is required when delivery fails.", "يجب ذكر السبب عند تعذّر التسليم."),
+        ("The amount must be greater than zero.", "يجب أن يكون المبلغ أكبر من صفر."),
+        ("Only PNG or JPEG images up to 3 MB are accepted.", "يُقبل فقط ملف صورة PNG أو JPEG بحجم أقصاه 3 ميغابايت."),
+        ("Choose Signature or Photo.", "اختر توقيعًا أو صورة."),
+        ("A stop can hold at most 5 proof files.", "تقبل المحطة 5 ملفات إثبات كحد أقصى."),
+        ("This account can only use the driver app.", "هذا الحساب مخصص لتطبيق السائق فقط."),
+        ("The Driver role needs a linked driver record.", "دور السائق يحتاج إلى سجل سائق مرتبط."),
+        ("The driver does not exist.", "السائق غير موجود."),
+        ("That driver is already linked to another account.", "هذا السائق مرتبط بحساب آخر."),
         ("Returns are already linked to this invoice. Cancel them first.", "توجد مرتجعات مرتبطة بهذه الفاتورة. ألغِها أولًا."),
 
         // ----- purchasing -----

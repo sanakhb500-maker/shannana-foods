@@ -8,9 +8,11 @@ public static class Roles
     public const string Purchasing = "Purchasing";
     public const string Sales = "Sales";
     public const string Dispatcher = "Dispatcher";
+    /// <summary>A delivery driver. Uses only the mobile app API (see DriverScopeMiddleware); linked to a Driver record.</summary>
+    public const string Driver = "Driver";
 
     public static readonly string[] All =
-        [Admin, Accountant, StoreKeeper, Purchasing, Sales, Dispatcher];
+        [Admin, Accountant, StoreKeeper, Purchasing, Sales, Dispatcher, Driver];
 }
 
 /// <summary>Authorization policy names. Each maps to the roles allowed to WRITE that area (everyone signed-in can read).</summary>
@@ -36,6 +38,7 @@ public static class Policies
     public const string ViewAccounting = "View.Accounting";
     public const string ManageAccounting = "Manage.Accounting";
     public const string ManageExpenseInvoices = "Manage.ExpenseInvoices";
+    public const string DriverApp = "Driver.App";
 
     public static readonly IReadOnlyDictionary<string, string[]> Map = new Dictionary<string, string[]>
     {
@@ -61,5 +64,6 @@ public static class Policies
         [ViewAccounting] = [Roles.Admin, Roles.Accountant],
         [ManageAccounting] = [Roles.Admin, Roles.Accountant],
         [ManageExpenseInvoices] = [Roles.Admin, Roles.Accountant, Roles.Purchasing],
+        [DriverApp] = [Roles.Driver],
     };
 }

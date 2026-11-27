@@ -4,6 +4,7 @@ import { Api, parseApiError } from '../core/api';
 import { Auth } from '../core/auth';
 import { TableFilter } from '../shared/list-search';
 import { I18n } from '../core/i18n';
+import { Lookups } from '../core/lookups';
 import { ROLES, UserDto } from '../core/models';
 
 @Component({
@@ -98,6 +99,18 @@ import { ROLES, UserDto } from '../core/models';
                 </div>
                 <small class="hint">{{ i18n.t('users.rolesHint') }}</small>
               </div>
+              @if (form.roles.includes('Driver')) {
+                <div class="field wide">
+                  <label for="u-driver">{{ i18n.t('users.driver') }} <span class="req">*</span></label>
+                  <select id="u-driver" class="input" name="driverId" [(ngModel)]="form.driverId">
+                    <option [ngValue]="null" disabled>{{ i18n.t('common.select') }}</option>
+                    @for (d of lookups.drivers(); track d.id) {
+                      @if (d.isActive) { <option [ngValue]="d.id">{{ d.name }}</option> }
+                    }
+                  </select>
+                  <small class="hint">{{ i18n.t('users.driverHint') }}</small>
+                </div>
+              }
               @if (mode === 'edit') {
                 <div class="field">
                   <label class="check"><input type="checkbox" name="isActive" [(ngModel)]="form.isActive" /> {{ i18n.t('common.active') }}</label>
@@ -119,6 +132,7 @@ export class UsersPage implements OnInit {
   private readonly api = inject(Api);
   readonly auth = inject(Auth);
   readonly i18n = inject(I18n);
+  readonly lookups = inject(Lookups);
 
   readonly allRoles = ROLES as readonly string[];
   readonly users = signal<UserDto[]>([]);
@@ -130,11 +144,12 @@ export class UsersPage implements OnInit {
   private targetId = 0;
 
   ngOnInit(): void {
+    this.lookups.ensureLoaded();
     this.load();
   }
 
   private blank() {
-    return { fullName: '', email: '', password: '', roles: [] as string[], isActive: true };
+    return { fullName: '', email: '', password: '', roles: [] as string[], isActive: true, driverId: null as number | null };
   }
 
   load(): void {
@@ -153,7 +168,7 @@ export class UsersPage implements OnInit {
   openEdit(u: UserDto): void {
     this.mode = 'edit';
     this.targetId = u.id;
-    this.form = { fullName: u.fullName, email: u.email, password: '', roles: [...u.roles], isActive: u.isActive };
+    this.form = { fullName: u.fullName, email: u.email, password: '', roles: [...u.roles], isActive: u.isActive, driverId: u.driverId ?? null };
     this.open();
   }
 
@@ -184,9 +199,9 @@ export class UsersPage implements OnInit {
     const f = this.form;
     const call =
       this.mode === 'new'
-        ? this.api.create('users', { email: f.email, fullName: f.fullName, password: f.password, roles: f.roles })
+        ? this.api.create('users', { email: f.email, fullName: f.fullName, password: f.password, roles: f.roles, driverId: f.roles.includes('Driver') ? f.driverId : null })
         : this.mode === 'edit'
-          ? this.api.update('users', this.targetId, { fullName: f.fullName, isActive: f.isActive, roles: f.roles })
+          ? this.api.update('users', this.targetId, { fullName: f.fullName, isActive: f.isActive, roles: f.roles, driverId: f.roles.includes('Driver') ? f.driverId : null })
           : this.api.post(`users/${this.targetId}/reset-password`, { newPassword: f.password });
     call.subscribe({
       next: () => {

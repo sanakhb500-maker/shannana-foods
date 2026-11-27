@@ -49,6 +49,7 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
     public DbSet<SalesOrderLine> SalesOrderLines => Set<SalesOrderLine>();
     public DbSet<DeliveryNote> DeliveryNotes => Set<DeliveryNote>();
     public DbSet<DeliveryNoteLine> DeliveryNoteLines => Set<DeliveryNoteLine>();
+    public DbSet<StopProof> StopProofs => Set<StopProof>();
     public DbSet<SalesInvoice> SalesInvoices => Set<SalesInvoice>();
     public DbSet<SalesInvoiceLine> SalesInvoiceLines => Set<SalesInvoiceLine>();
     public DbSet<SalesReturn> SalesReturns => Set<SalesReturn>();
@@ -169,6 +170,8 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
             e.Property(x => x.Name).HasMaxLength(200);
             e.Property(x => x.Phone).HasMaxLength(30);
             e.Property(x => x.LicenseNumber).HasMaxLength(50);
+            e.HasIndex(x => x.UserId).IsUnique().HasFilter("[UserId] IS NOT NULL");
+            e.HasOne<AppUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         b.Entity<Vehicle>(e =>
@@ -412,6 +415,8 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
             e.Property(x => x.Method).HasConversion<int>();
             e.HasOne<Customer>().WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<Currency>().WithMany().HasForeignKey(x => x.CurrencyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(x => x.TripStopId);
+            e.HasOne<TripStop>().WithMany().HasForeignKey(x => x.TripStopId).OnDelete(DeleteBehavior.Restrict);
             e.ToTable(t => t.HasCheckConstraint("CK_CustomerReceipt_Amount", "[Amount] > 0 AND [ExchangeRate] > 0"));
         });
 
@@ -434,6 +439,15 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
             e.Property(x => x.Notes).HasMaxLength(300);
             e.Property(x => x.Status).HasConversion<int>();
             e.HasOne<DeliveryNote>().WithMany().HasForeignKey(x => x.DeliveryNoteId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<StopProof>(e =>
+        {
+            e.HasIndex(x => x.TripStopId);
+            e.Property(x => x.FileName).HasMaxLength(100);
+            e.Property(x => x.ContentType).HasMaxLength(50);
+            e.Property(x => x.Kind).HasConversion<int>();
+            e.HasOne<TripStop>().WithMany().HasForeignKey(x => x.TripStopId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 

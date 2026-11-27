@@ -304,6 +304,9 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
+                    b.Property<int?>("TripStopId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
@@ -317,6 +320,8 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.HasIndex("Number")
                         .IsUnique()
                         .HasFilter("[Number] IS NOT NULL");
+
+                    b.HasIndex("TripStopId");
 
                     b.HasIndex("CustomerId", "Date");
 
@@ -604,7 +609,14 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<int?>("UserId")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasFilter("[UserId] IS NOT NULL");
 
                     b.ToTable("Drivers");
                 });
@@ -2340,6 +2352,55 @@ namespace Erp.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Erp.Domain.Entities.StopProof", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("TripStopId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripStopId");
+
+                    b.ToTable("StopProofs");
+                });
+
             modelBuilder.Entity("Erp.Domain.Entities.Supplier", b =>
                 {
                     b.Property<int>("Id")
@@ -2534,8 +2595,17 @@ namespace Erp.Infrastructure.Persistence.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime?>("ActionAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("DeliveryNoteId")
                         .HasColumnType("int");
+
+                    b.Property<double?>("Latitude")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("Longitude")
+                        .HasColumnType("float");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(300)
@@ -2939,6 +3009,11 @@ namespace Erp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Erp.Domain.Entities.TripStop", null)
+                        .WithMany()
+                        .HasForeignKey("TripStopId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Erp.Domain.Entities.CustomerReceiptAllocation", b =>
@@ -3015,6 +3090,14 @@ namespace Erp.Infrastructure.Persistence.Migrations
                         .HasForeignKey("VehicleId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.Driver", b =>
+                {
+                    b.HasOne("Erp.Infrastructure.Identity.AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Erp.Domain.Entities.ExchangeRate", b =>
@@ -3487,6 +3570,15 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.HasOne("Erp.Domain.Entities.StockTransfer", null)
                         .WithMany("Lines")
                         .HasForeignKey("StockTransferId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Erp.Domain.Entities.StopProof", b =>
+                {
+                    b.HasOne("Erp.Domain.Entities.TripStop", null)
+                        .WithMany()
+                        .HasForeignKey("TripStopId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

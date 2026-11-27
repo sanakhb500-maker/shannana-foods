@@ -26,10 +26,11 @@ export interface UserDto {
   fullName: string;
   isActive: boolean;
   roles: string[];
+  driverId?: number | null;
 }
 
 /** Roles, mirrored from Erp.Domain.Common.Roles. */
-export const ROLES = ['Admin', 'Accountant', 'StoreKeeper', 'Purchasing', 'Sales', 'Dispatcher'] as const;
+export const ROLES = ['Admin', 'Accountant', 'StoreKeeper', 'Purchasing', 'Sales', 'Dispatcher', 'Driver'] as const;
 export type Role = (typeof ROLES)[number];
 
 /** Who may write each area — mirrors Erp.Domain.Common.Policies (the API is the real enforcement). */
@@ -104,7 +105,7 @@ export type TripStatus = 'Planned' | 'InTransit' | 'Completed' | 'Cancelled';
 export type StopStatus = 'Pending' | 'Delivered' | 'Failed';
 
 export interface TripRow { id: number; number: string | null; date: string; driverId: number; vehicleId: number; status: TripStatus; stopCount: number; deliveredCount: number }
-export interface TripStop { id?: number; sequence: number; status: StopStatus; notes: string | null; deliveryNoteId: number; deliveryNumber: string | null; customerId: number; totalAmount: number; currencyId: number; deliveryStatus: DocStatus }
+export interface TripStop { id?: number; sequence: number; status: StopStatus; notes: string | null; deliveryNoteId: number; deliveryNumber: string | null; customerId: number; totalAmount: number; currencyId: number; deliveryStatus: DocStatus; actionAt?: string | null; collected?: number; proofIds?: number[] }
 export interface Trip { id?: number; number?: string | null; date: string; driverId: number | null; vehicleId: number | null; status: TripStatus; notes: string | null; startedAt?: string | null; completedAt?: string | null; stops: TripStop[]; totalWeightKg?: number; capacityKg?: number; overCapacity?: boolean; linesWithoutWeight?: number }
 export interface DeliveryRow { id: number; number: string | null; customerId: number; totalAmount: number; currencyId: number; status: DocStatus; tripNumber: string | null }
 

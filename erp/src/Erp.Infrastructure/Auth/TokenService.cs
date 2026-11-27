@@ -9,14 +9,14 @@ namespace Erp.Infrastructure.Auth;
 
 public interface ITokenService
 {
-    (string Token, DateTime ExpiresAt) Create(AppUser user, IEnumerable<string> roles);
+    (string Token, DateTime ExpiresAt) Create(AppUser user, IEnumerable<string> roles, bool mobile = false);
 }
 
 public class TokenService(IOptions<JwtOptions> options) : ITokenService
 {
     private readonly JwtOptions _o = options.Value;
 
-    public (string Token, DateTime ExpiresAt) Create(AppUser user, IEnumerable<string> roles)
+    public (string Token, DateTime ExpiresAt) Create(AppUser user, IEnumerable<string> roles, bool mobile = false)
     {
         var claims = new List<Claim>
         {
@@ -29,7 +29,7 @@ public class TokenService(IOptions<JwtOptions> options) : ITokenService
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_o.Key));
-        var expires = DateTime.UtcNow.AddMinutes(_o.ExpiryMinutes);
+        var expires = DateTime.UtcNow.AddMinutes(mobile ? _o.MobileExpiryMinutes : _o.ExpiryMinutes);
         var jwt = new JwtSecurityToken(_o.Issuer, _o.Audience, claims, expires: expires,
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
         return (new JwtSecurityTokenHandler().WriteToken(jwt), expires);
