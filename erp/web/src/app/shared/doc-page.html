@@ -2,12 +2,10 @@
   <h1>{{ i18n.t(cfg.title) }}</h1>
   <div class="page-tools">
     @if (cfg.filters.includes('party')) {
-      <select class="input" [(ngModel)]="partyFilter" (ngModelChange)="reload()">
-        <option [ngValue]="null">{{ i18n.t(cfg.partyKey === 'supplierId' ? 'pur.allSuppliers' : 'sal.allCustomers') }}</option>
-        @for (p of partyOptions; track p.value) {
-          <option [ngValue]="p.value">{{ p.label }}</option>
-        }
-      </select>
+      <app-search-select class="filter-select" [kind]="cfg.partyKey === 'supplierId' ? 'suppliers' : 'customers'" [name]="'partyFilter'" [(ngModel)]="partyFilter" (ngModelChange)="reload()" [activeOnly]="false" />
+      @if (partyFilter) {
+        <button class="btn sm" type="button" (click)="partyFilter = null; reload()">✕ {{ i18n.t(cfg.partyKey === 'supplierId' ? 'pur.allSuppliers' : 'sal.allCustomers') }}</button>
+      }
     }
     <select class="input" [(ngModel)]="status" (ngModelChange)="reload()">
       <option value="">{{ i18n.t('inv.allStatuses') }}</option>
@@ -88,6 +86,9 @@
             <label [for]="'d-' + f.key">{{ i18n.t(f.label) }} @if (f.required) {<span class="req">*</span>}</label>
             @switch (f.type) {
               @case ('select') {
+                @if (searchKind(f); as k) {
+                  <app-search-select [kind]="k" [name]="f.key" [(ngModel)]="d[f.key]" (ngModelChange)="changed(f.key)" [disabled]="fieldDisabled(f, d)" />
+                } @else {
                 <select class="input" [id]="'d-' + f.key" [name]="f.key" [(ngModel)]="d[f.key]" (ngModelChange)="changed(f.key)" [disabled]="fieldDisabled(f, d)">
                   @if (f.nullable) {
                     <option [ngValue]="null">{{ i18n.t('common.none') }}</option>
@@ -98,6 +99,7 @@
                     <option [ngValue]="o.value">{{ o.label }}</option>
                   }
                 </select>
+                }
               }
               @default {
                 <input class="input" [id]="'d-' + f.key" [name]="f.key" [type]="f.type" [step]="f.step ?? null" [(ngModel)]="d[f.key]"
@@ -175,12 +177,7 @@
                     @switch (c.kind) {
                       @case ('item') {
                         <td>
-                          <select class="input" [name]="'item' + i" [(ngModel)]="l['itemId']" (ngModelChange)="itemChanged(l)" [disabled]="!editable() || lineLinked(l)">
-                            <option [ngValue]="0" disabled>{{ i18n.t('common.select') }}</option>
-                            @for (it of itemChoices(l['itemId']); track it.id) {
-                              <option [ngValue]="it.id">{{ lookups.itemLabel(it.id) }}</option>
-                            }
-                          </select>
+                          <app-search-select kind="items" [name]="'item' + i" [(ngModel)]="l['itemId']" (ngModelChange)="itemChanged(l)" [disabled]="!editable() || lineLinked(l)" />
                         </td>
                       }
                       @case ('account') {

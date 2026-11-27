@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, parseApiError } from '../core/api';
+import { SearchSelect } from '../shared/search-select';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
 import { BalanceRow, BalancesResult, LowStockRow, MovementRow, Paged } from '../core/models';
@@ -9,17 +10,12 @@ import { BalanceRow, BalancesResult, LowStockRow, MovementRow, Paged } from '../
 /** Stock on hand per item and warehouse, with the total stock value (quantity x moving-average cost). */
 @Component({
   selector: 'app-stock-balances-page',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, SearchSelect],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.stockBalances') }}</h1>
       <div class="page-tools">
-        <select class="input" [(ngModel)]="warehouseId" (ngModelChange)="reload()">
-          <option [ngValue]="null">{{ i18n.t('inv.allWarehouses') }}</option>
-          @for (w of lookups.activeWarehouses(); track w.id) {
-            <option [ngValue]="w.id">{{ lookups.warehouseLabel(w.id) }}</option>
-          }
-        </select>
+        <app-search-select name="warehouse" kind="warehouses" [clearable]="true" [placeholder]="i18n.t('inv.allWarehouses')" [(ngModel)]="warehouseId" (ngModelChange)="reload()" />
         <input class="input" type="search" [placeholder]="i18n.t('common.search')" [(ngModel)]="q" (input)="onSearch()" />
         <label class="check"><input type="checkbox" [(ngModel)]="includeZero" (change)="reload()" /> {{ i18n.t('inv.includeZero') }}</label>
       </div>
@@ -133,23 +129,13 @@ export class StockBalancesPage implements OnInit {
 /** The stock ledger: every movement, newest first. */
 @Component({
   selector: 'app-stock-movements-page',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, SearchSelect],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.stockMovements') }}</h1>
       <div class="page-tools">
-        <select class="input" [(ngModel)]="itemId" (ngModelChange)="reload()">
-          <option [ngValue]="null">{{ i18n.t('inv.allItems') }}</option>
-          @for (i of lookups.items(); track i.id) {
-            <option [ngValue]="i.id">{{ lookups.itemLabel(i.id) }}</option>
-          }
-        </select>
-        <select class="input" [(ngModel)]="warehouseId" (ngModelChange)="reload()">
-          <option [ngValue]="null">{{ i18n.t('inv.allWarehouses') }}</option>
-          @for (w of lookups.warehouses(); track w.id) {
-            <option [ngValue]="w.id">{{ lookups.warehouseLabel(w.id) }}</option>
-          }
-        </select>
+        <app-search-select name="item" kind="items" [clearable]="true" [activeOnly]="false" [placeholder]="i18n.t('inv.allItems')" [(ngModel)]="itemId" (ngModelChange)="reload()" />
+        <app-search-select name="warehouse" kind="warehouses" [clearable]="true" [activeOnly]="false" [placeholder]="i18n.t('inv.allWarehouses')" [(ngModel)]="warehouseId" (ngModelChange)="reload()" />
         <input class="input date" type="date" [(ngModel)]="from" (ngModelChange)="reload()" [title]="i18n.t('inv.from')" />
         <input class="input date" type="date" [(ngModel)]="to" (ngModelChange)="reload()" [title]="i18n.t('inv.to')" />
       </div>

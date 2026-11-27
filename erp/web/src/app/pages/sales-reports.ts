@@ -3,6 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Api, parseApiError } from '../core/api';
+import { SearchSelect } from '../shared/search-select';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
 import { CustomerBalanceRow } from '../core/models';
@@ -94,17 +95,12 @@ export class CustomerBalancesPage implements OnInit {
 /** One customer's account: invoices raise what they owe; returns and receipts lower it. */
 @Component({
   selector: 'app-customer-statement-page',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, SearchSelect],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.customerStatement') }}</h1>
       <div class="page-tools">
-        <select class="input" [(ngModel)]="customerId" (ngModelChange)="load()">
-          <option [ngValue]="null" disabled>{{ i18n.t('common.select') }}</option>
-          @for (c of lookups.customers(); track c.id) {
-            <option [ngValue]="c.id">{{ lookups.customerLabel(c.id) }}</option>
-          }
-        </select>
+        <app-search-select name="customer" kind="customers" [activeOnly]="false" [(ngModel)]="customerId" (ngModelChange)="load()" />
         <input class="input date" type="date" [(ngModel)]="from" (ngModelChange)="load()" [title]="i18n.t('inv.from')" />
         <input class="input date" type="date" [(ngModel)]="to" (ngModelChange)="load()" [title]="i18n.t('inv.to')" />
       </div>

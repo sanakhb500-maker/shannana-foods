@@ -3,6 +3,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Api, parseApiError } from '../core/api';
+import { SearchSelect } from '../shared/search-select';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
 import { SupplierBalanceRow, SupplierStatement } from '../core/models';
@@ -88,17 +89,12 @@ export class SupplierBalancesPage implements OnInit {
 /** One supplier's account: invoices raise what we owe, payments lower it. Shown in local currency with the original amount alongside. */
 @Component({
   selector: 'app-supplier-statement-page',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, SearchSelect],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.supplierStatement') }}</h1>
       <div class="page-tools">
-        <select class="input" [(ngModel)]="supplierId" (ngModelChange)="load()">
-          <option [ngValue]="null" disabled>{{ i18n.t('common.select') }}</option>
-          @for (s of lookups.suppliers(); track s.id) {
-            <option [ngValue]="s.id">{{ lookups.supplierLabel(s.id) }}</option>
-          }
-        </select>
+        <app-search-select name="supplier" kind="suppliers" [activeOnly]="false" [(ngModel)]="supplierId" (ngModelChange)="load()" />
         <input class="input date" type="date" [(ngModel)]="from" (ngModelChange)="load()" [title]="i18n.t('inv.from')" />
         <input class="input date" type="date" [(ngModel)]="to" (ngModelChange)="load()" [title]="i18n.t('inv.to')" />
       </div>

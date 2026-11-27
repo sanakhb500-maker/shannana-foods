@@ -133,6 +133,9 @@ Roles: Admin, Accountant, StoreKeeper, Purchasing, Sales, Dispatcher. Everyone s
 - **Purchase returns** (`PRT-` numbers): confirming takes the goods out of the warehouse at its average cost and lowers what we owe the supplier (Dr Payables at the return price, Cr Inventory at cost, difference to *Goods received not invoiced*). Cancelling reverses both. Supplier statement/balances show them; the Payables reconciliation counts them.
 - **Linking to an invoice** (purchase returns -> purchase invoice, sales returns -> sales invoice; optional): the invoice must be confirmed, same supplier/customer and currency, items must be on it, and per item the returned quantity cannot exceed *invoiced - already returned (confirmed)*. A confirmed linked return reduces the invoice's **outstanding** amount (open invoices, ageing, allocation cap, revaluation). An invoice with confirmed linked returns cannot be cancelled until they are cancelled. From a confirmed invoice screen, *Create return* pre-fills a return.
 
+## Search selects (large lists)
+Item, supplier, customer and warehouse pickers (document headers and lines, transfers, adjustments, statements, stock filters) are **server-side search selects**: type a code or name and the API returns the best 20 matches, so lists with thousands of records work. Records fetched this way are added to the client cache so their labels display correctly; list pages fetch labels for any id outside the cached first 500. Master-data lists (currencies, units, drivers, vehicles, accounts) are still plain dropdowns because they stay small.
+
 ## Tests
 ```powershell
 cd erp

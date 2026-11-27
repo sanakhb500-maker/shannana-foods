@@ -9,6 +9,8 @@ import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
 import { OpenInvoice, Paged } from '../core/models';
 import { DOC_CONFIGS, DocConfig, DocField, ListCol } from './doc-config';
+import { SearchSelect } from './search-select';
+import { LookupKind } from '../core/lookups';
 
 type Doc = Record<string, any> & { lines?: Record<string, any>[] };
 type Row = Record<string, any> & { id: number };
@@ -22,7 +24,7 @@ const today = () => new Date().toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-doc-page',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, SearchSelect],
   templateUrl: './doc-page.html',
 })
 export class DocPage implements OnInit {
@@ -109,6 +111,11 @@ export class DocPage implements OnInit {
     this.api.get<Paged<Row>>(`${this.cfg.endpoint}?${qs.join('&')}`).subscribe({
       next: (r) => {
         this.rows.set(r.items);
+        // labels for records beyond the cached first 500
+        for (const c of this.cfg.listCols) {
+          const kind = c.kind === 'supplier' ? 'suppliers' : c.kind === 'customer' ? 'customers' : c.kind === 'warehouse' ? 'warehouses' : null;
+          if (kind) this.lookups.ensureIds(kind, r.items.map((x) => x[c.key]));
+        }
         this.total.set(r.total);
         this.loading.set(false);
       },
@@ -133,13 +140,12 @@ export class DocPage implements OnInit {
     }
   }
 
-  get partyOptions(): Option[] {
-    return this.cfg.partyKey === 'supplierId'
-      ? this.lookups.suppliers().map((s) => ({ value: s.id, label: this.lookups.supplierLabel(s.id) }))
-      : this.lookups.customers().map((c) => ({ value: c.id, label: this.lookups.customerLabel(c.id) }));
+  // ---------- header field helpers ----------
+  /** Which header selects use the server-side search (large lists) instead of a plain dropdown. */
+  searchKind(f: DocField): LookupKind | null {
+    return f.options === 'suppliers' || f.options === 'customers' || f.options === 'warehouses' ? f.options : null;
   }
 
-  // ---------- header field helpers ----------
   optionsFor(f: DocField, selected: unknown): Option[] {
     switch (f.options) {
       case 'suppliers': return this.lookups.suppliers().filter((s) => s.isActive || s.id === selected).map((s) => ({ value: s.id, label: this.lookups.supplierLabel(s.id) }));
@@ -176,10 +182,6 @@ export class DocPage implements OnInit {
 
   private orderId(d: Doc): number | null {
     return this.cfg.order ? (d[this.cfg.order.idKey] ?? null) : null;
-  }
-
-  itemChoices(selected: number) {
-    return this.lookups.items().filter((i) => i.isActive || i.id === selected);
   }
 
   /** Selling documents: suggest the item's sale price (converted to the document currency) when the price is still empty. */

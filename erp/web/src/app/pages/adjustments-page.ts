@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
 import { Api, parseApiError } from '../core/api';
 import { Auth } from '../core/auth';
+import { SearchSelect } from '../shared/search-select';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
 import { Adjustment, AdjustmentReason, AdjustmentRow, DocStatus, Paged, WRITE_ROLES } from '../core/models';
@@ -16,7 +17,7 @@ const today = () => new Date().toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-adjustments-page',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, SearchSelect],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.adjustments') }}</h1>
@@ -95,12 +96,7 @@ const today = () => new Date().toISOString().slice(0, 10);
             </div>
             <div class="field">
               <label for="a-wh">{{ i18n.t('f.warehouse') }} <span class="req">*</span></label>
-              <select id="a-wh" class="input" name="warehouse" [(ngModel)]="d.warehouseId" [disabled]="!editable()">
-                <option [ngValue]="null" disabled>{{ i18n.t('common.select') }}</option>
-                @for (w of warehouseChoices(d.warehouseId); track w.id) {
-                  <option [ngValue]="w.id">{{ lookups.warehouseLabel(w.id) }}</option>
-                }
-              </select>
+              <app-search-select kind="warehouses" name="warehouse" [(ngModel)]="d.warehouseId" [disabled]="!editable()" />
             </div>
             <div class="field">
               <label for="a-reason">{{ i18n.t('inv.reason') }} <span class="req">*</span></label>
@@ -137,12 +133,7 @@ const today = () => new Date().toISOString().slice(0, 10);
                 @for (l of d.lines; track $index; let i = $index) {
                   <tr>
                     <td>
-                      <select class="input" [name]="'item' + i" [(ngModel)]="l.itemId" [disabled]="!editable()">
-                        <option [ngValue]="0" disabled>{{ i18n.t('common.select') }}</option>
-                        @for (it of itemChoices(l.itemId); track it.id) {
-                          <option [ngValue]="it.id">{{ lookups.itemLabel(it.id) }}</option>
-                        }
-                      </select>
+                      <app-search-select kind="items" [name]="'item' + i" [(ngModel)]="l.itemId" [disabled]="!editable()" />
                     </td>
                     <td class="num"><input class="input qty" type="number" step="0.0001" min="0" [name]="'cnt' + i" [(ngModel)]="l.countedQuantity" [disabled]="!editable()" /></td>
                     <td class="num"><input class="input qty" type="number" step="0.0001" min="0" [name]="'cost' + i" [(ngModel)]="l.unitCost" [disabled]="!editable()" /></td>
@@ -204,14 +195,6 @@ export class AdjustmentsPage implements OnInit {
   ngOnInit(): void {
     this.lookups.ensureLoaded();
     this.load();
-  }
-
-  warehouseChoices(selected: number | null) {
-    return this.lookups.warehouses().filter((w) => w.isActive || w.id === selected);
-  }
-
-  itemChoices(selected: number) {
-    return this.lookups.items().filter((i) => i.isActive || i.id === selected);
   }
 
   reload(): void {

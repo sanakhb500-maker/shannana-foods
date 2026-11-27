@@ -1,7 +1,10 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Observable, forkJoin, map } from 'rxjs';
 import { Api } from './api';
 import { I18n } from './i18n';
 import { AccountDto, LookupCurrency, LookupCustomer, LookupDriver, LookupItem, LookupSupplier, LookupVehicle, LookupWarehouse } from './models';
+
+export type LookupKind = 'items' | 'suppliers' | 'customers' | 'warehouses';
 
 /** Cached reference data, used to label ids and fill selects on inventory and purchasing screens. */
 @Injectable({ providedIn: 'root' })
@@ -23,7 +26,45 @@ export class Lookups {
   readonly activeCurrencies = computed(() => this.currencies().filter((c) => c.isActive));
   private loaded = false;
 
-  /** Loads once; call `refresh()` to force. (Limit: the first 500 of each.) */
+  private signalOf(kind: LookupKind) {
+    return { items: this.items, suppliers: this.suppliers, customers: this.customers, warehouses: this.warehouses }[kind] as unknown as
+      import('@angular/core').WritableSignal<{ id: number; code: string; nameAr: string; nameEn: string; isActive: boolean }[]>;
+  }
+
+  endpointOf(kind: LookupKind): string {
+    return kind;
+  }
+
+  /** Adds records the server returned (search results, single fetches) to the cache so their labels resolve even beyond the first 500. */
+  remember(kind: LookupKind, rows: { id: number }[]): void {
+    const sig = this.signalOf(kind);
+    const known = new Set(sig().map((x) => x.id));
+    const fresh = (rows as any[]).filter((r) => !known.has(r.id));
+    if (fresh.length) sig.update((list) => [...list, ...fresh]);
+  }
+
+  labelOf(kind: LookupKind, id: number): string {
+    const r = this.signalOf(kind)().find((x) => x.id === id);
+    return r ? `${r.code} — ${this.i18n.name(r)}` : '';
+  }
+
+  fetchOne(kind: LookupKind, id: number): Observable<string> {
+    return this.api.get<{ id: number; code: string; nameAr: string; nameEn: string; isActive: boolean }>(`${this.endpointOf(kind)}/${id}`).pipe(
+      map((r) => {
+        this.remember(kind, [r]);
+        return this.labelOf(kind, id);
+      }),
+    );
+  }
+
+  /** Makes sure the given ids can be labelled (a list page showing a record outside the cached 500). */
+  ensureIds(kind: LookupKind, ids: (number | null | undefined)[]): void {
+    const known = new Set(this.signalOf(kind)().map((x) => x.id));
+    const missing = [...new Set(ids.filter((i): i is number => !!i && !known.has(i)))];
+    if (missing.length) forkJoin(missing.map((id) => this.fetchOne(kind, id))).subscribe({ error: () => {} });
+  }
+
+  /** Loads once; call `refresh()` to force. The cache only holds the first 500 of each; search selects fetch the rest on demand. */
   ensureLoaded(): void {
     if (this.loaded) return;
     this.refresh();
