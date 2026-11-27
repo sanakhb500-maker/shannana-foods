@@ -10,6 +10,7 @@ import { Lookups } from '../core/lookups';
 import { OpenInvoice, Paged } from '../core/models';
 import { DOC_CONFIGS, DocConfig, DocField, ListCol } from './doc-config';
 import { SearchSelect } from './search-select';
+import { ListSearch } from './list-search';
 import { LookupKind } from '../core/lookups';
 
 type Doc = Record<string, any> & { lines?: Record<string, any>[] };
@@ -24,7 +25,7 @@ const today = () => new Date().toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-doc-page',
-  imports: [FormsModule, DecimalPipe, SearchSelect],
+  imports: [FormsModule, DecimalPipe, SearchSelect, ListSearch],
   templateUrl: './doc-page.html',
 })
 export class DocPage implements OnInit {
@@ -54,6 +55,12 @@ export class DocPage implements OnInit {
   status = '';
   partyFilter: number | null = null;
   pendingOnly = false;
+  q = '';
+
+  onQuery(v: string): void {
+    this.q = v;
+    this.reload();
+  }
 
   readonly editable = computed(() => this.canWrite && (this.doc()?.['status'] ?? 'Draft') === 'Draft');
   readonly visibleLineCols = computed(() =>
@@ -108,6 +115,7 @@ export class DocPage implements OnInit {
     if (this.status) qs.push(`status=${this.status}`);
     if (this.partyFilter) qs.push(`${this.cfg.partyKey}=${this.partyFilter}`);
     if (this.pendingOnly) qs.push('pendingOnly=true');
+    if (this.q) qs.push(`q=${encodeURIComponent(this.q)}`);
     this.api.get<Paged<Row>>(`${this.cfg.endpoint}?${qs.join('&')}`).subscribe({
       next: (r) => {
         this.rows.set(r.items);

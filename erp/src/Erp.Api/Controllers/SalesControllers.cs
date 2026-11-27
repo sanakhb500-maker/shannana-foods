@@ -235,8 +235,8 @@ public class TripsController(ISalesService svc, IValidator<TripInput> tripValida
 
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] TripStatus? status, [FromQuery] int? driverId, [FromQuery] int? vehicleId,
-        [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default) =>
-        Ok(ApiResponse.Ok(await svc.ListTripsAsync(new TripFilter(status, driverId, vehicleId, from, to, page, pageSize), ct)));
+        [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? q = null, CancellationToken ct = default) =>
+        Ok(ApiResponse.Ok(await svc.ListTripsAsync(new TripFilter(status, driverId, vehicleId, from, to, page, pageSize, q), ct)));
 
     [HttpGet("{id:int}")]
     public async Task<IActionResult> Get(int id, CancellationToken ct) => Ok(ApiResponse.Ok(await svc.GetTripAsync(id, ct)));

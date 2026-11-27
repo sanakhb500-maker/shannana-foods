@@ -116,8 +116,8 @@ public class StockReportsController(IInventoryService svc) : ControllerBase
 
     [HttpGet("movements")]
     public async Task<IActionResult> Movements([FromQuery] int? warehouseId, [FromQuery] int? itemId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to,
-        [FromQuery] string? documentType, [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default) =>
-        Ok(ApiResponse.Ok(await svc.GetMovementsAsync(new MovementFilter(warehouseId, itemId, from, to, documentType, page, pageSize), ct)));
+        [FromQuery] string? documentType, [FromQuery] int page = 1, [FromQuery] int pageSize = 50, [FromQuery] string? q = null, CancellationToken ct = default) =>
+        Ok(ApiResponse.Ok(await svc.GetMovementsAsync(new MovementFilter(warehouseId, itemId, from, to, documentType, page, pageSize, q), ct)));
 
     [HttpGet("low-stock")]
     public async Task<IActionResult> LowStock(CancellationToken ct) => Ok(ApiResponse.Ok(await svc.GetLowStockAsync(ct)));

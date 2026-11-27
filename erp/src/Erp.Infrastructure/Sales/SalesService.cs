@@ -799,6 +799,12 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         if (f.VehicleId is { } vid) q = q.Where(t => t.VehicleId == vid);
         if (f.From is { } from) q = q.Where(t => t.Date >= from);
         if (f.To is { } to) q = q.Where(t => t.Date <= to);
+        if (!string.IsNullOrWhiteSpace(f.Q))
+        {
+            var s = Like(f.Q);
+            q = q.Where(t => (t.Number != null && t.Number.Contains(s)) || (t.Notes != null && t.Notes.Contains(s))
+                             || db.Drivers.Any(d => d.Id == t.DriverId && d.Name.Contains(s)) || db.Vehicles.Any(v => v.Id == t.VehicleId && v.PlateNumber.Contains(s)));
+        }
 
         var (page, size) = Paging(f.Page, f.PageSize);
         var total = await q.CountAsync(ct);

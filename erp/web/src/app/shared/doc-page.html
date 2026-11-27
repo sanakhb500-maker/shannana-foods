@@ -1,11 +1,10 @@
 <header class="page-head">
   <h1>{{ i18n.t(cfg.title) }}</h1>
   <div class="page-tools">
+    <app-list-search (search)="onQuery($event)" />
     @if (cfg.filters.includes('party')) {
-      <app-search-select class="filter-select" [kind]="cfg.partyKey === 'supplierId' ? 'suppliers' : 'customers'" [name]="'partyFilter'" [(ngModel)]="partyFilter" (ngModelChange)="reload()" [activeOnly]="false" />
-      @if (partyFilter) {
-        <button class="btn sm" type="button" (click)="partyFilter = null; reload()">✕ {{ i18n.t(cfg.partyKey === 'supplierId' ? 'pur.allSuppliers' : 'sal.allCustomers') }}</button>
-      }
+      <app-search-select class="filter-select" [kind]="cfg.partyKey === 'supplierId' ? 'suppliers' : 'customers'" [name]="'partyFilter'" [(ngModel)]="partyFilter" (ngModelChange)="reload()" [activeOnly]="false" [clearable]="true"
+                         [placeholder]="i18n.t(cfg.partyKey === 'supplierId' ? 'pur.allSuppliers' : 'sal.allCustomers')" />
     }
     <select class="input" [(ngModel)]="status" (ngModelChange)="reload()">
       <option value="">{{ i18n.t('inv.allStatuses') }}</option>

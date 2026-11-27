@@ -35,6 +35,7 @@ const DICT: Record<string, { ar: string; en: string }> = {
   'login.submit': { ar: 'دخول', en: 'Sign in' },
   'login.failed': { ar: 'بيانات الدخول غير صحيحة', en: 'Invalid email or password' },
   // common
+  'nav.find': { ar: 'ابحث عن شاشة…', en: 'Find a screen…' },
   'common.search': { ar: 'بحث…', en: 'Search…' },
   'common.add': { ar: 'إضافة', en: 'Add' },
   'common.edit': { ar: 'تعديل', en: 'Edit' },

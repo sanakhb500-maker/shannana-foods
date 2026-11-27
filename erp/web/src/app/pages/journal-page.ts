@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
 import { Api, parseApiError } from '../core/api';
 import { Auth } from '../core/auth';
+import { ListSearch } from '../shared/list-search';
 import { I18n } from '../core/i18n';
 import { AccountDto, JournalEntry, JournalLine, JournalRow, Paged, WRITE_ROLES } from '../core/models';
 
@@ -16,11 +17,12 @@ const SOURCES = ['Manual', 'GoodsReceipt', 'PurchaseInvoice', 'SupplierPayment',
  */
 @Component({
   selector: 'app-journal-page',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, ListSearch],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.journal') }}</h1>
       <div class="page-tools">
+        <app-list-search (search)="onQuery($event)" />
         <select class="input" [(ngModel)]="source" (ngModelChange)="reload()">
           <option value="">{{ i18n.t('acc.allSources') }}</option>
           @for (s of sources; track s) {
@@ -209,6 +211,13 @@ export class JournalPage implements OnInit {
     return this.accounts().filter((a) => (a.isActive && a.isPostable) || a.id === selected);
   }
 
+  q = '';
+
+  onQuery(v: string): void {
+    this.q = v;
+    this.reload();
+  }
+
   reload(): void {
     this.page.set(1);
     this.load();
@@ -226,6 +235,7 @@ export class JournalPage implements OnInit {
     if (this.status) qs.push(`status=${this.status}`);
     if (this.from) qs.push(`from=${this.from}`);
     if (this.to) qs.push(`to=${this.to}`);
+    if (this.q) qs.push(`q=${encodeURIComponent(this.q)}`);
     this.api.get<Paged<JournalRow>>(`journalentries?${qs.join('&')}`).subscribe({
       next: (r) => {
         this.rows.set(r.items);

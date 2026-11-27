@@ -3,6 +3,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, parseApiError } from '../core/api';
 import { SearchSelect } from '../shared/search-select';
+import { ListSearch, TableFilter } from '../shared/list-search';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
 import { BalanceRow, BalancesResult, LowStockRow, MovementRow, Paged } from '../core/models';
@@ -129,11 +130,12 @@ export class StockBalancesPage implements OnInit {
 /** The stock ledger: every movement, newest first. */
 @Component({
   selector: 'app-stock-movements-page',
-  imports: [FormsModule, DecimalPipe, SearchSelect],
+  imports: [FormsModule, DecimalPipe, SearchSelect, ListSearch],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.stockMovements') }}</h1>
       <div class="page-tools">
+        <app-list-search (search)="onQuery($event)" />
         <app-search-select name="item" kind="items" [clearable]="true" [activeOnly]="false" [placeholder]="i18n.t('inv.allItems')" [(ngModel)]="itemId" (ngModelChange)="reload()" />
         <app-search-select name="warehouse" kind="warehouses" [clearable]="true" [activeOnly]="false" [placeholder]="i18n.t('inv.allWarehouses')" [(ngModel)]="warehouseId" (ngModelChange)="reload()" />
         <input class="input date" type="date" [(ngModel)]="from" (ngModelChange)="reload()" [title]="i18n.t('inv.from')" />
@@ -200,6 +202,12 @@ export class StockMovementsPage implements OnInit {
   readonly message = signal('');
   itemId: number | null = null;
   warehouseId: number | null = null;
+  q = '';
+
+  onQuery(v: string): void {
+    this.q = v;
+    this.reload();
+  }
   from = '';
   to = '';
 
@@ -229,6 +237,7 @@ export class StockMovementsPage implements OnInit {
     if (this.warehouseId) qs.push(`warehouseId=${this.warehouseId}`);
     if (this.from) qs.push(`from=${this.from}`);
     if (this.to) qs.push(`to=${this.to}`);
+    if (this.q) qs.push(`q=${encodeURIComponent(this.q)}`);
     this.api.get<Paged<MovementRow>>(`stock/movements?${qs.join('&')}`).subscribe({
       next: (r) => {
         this.rows.set(r.items);
@@ -246,9 +255,12 @@ export class StockMovementsPage implements OnInit {
 /** Items whose total stock is at or below their reorder level. */
 @Component({
   selector: 'app-low-stock-page',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, TableFilter],
   template: `
-    <header class="page-head"><h1>{{ i18n.t('nav.lowStock') }}</h1></header>
+    <header class="page-head">
+      <h1>{{ i18n.t('nav.lowStock') }}</h1>
+      <div class="page-tools"><app-table-filter /></div>
+    </header>
     @if (message()) {
       <div class="alert error">{{ message() }}</div>
     }

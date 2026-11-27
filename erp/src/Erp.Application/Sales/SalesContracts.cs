@@ -42,7 +42,7 @@ public sealed record StopStatusInput(StopStatus Status, string? Notes);
 public sealed record SalesFilter(DocumentStatus? Status, int? CustomerId, string? Q, bool PendingOnly = false, bool UnassignedOnly = false,
     int Page = 1, int PageSize = 20);
 
-public sealed record TripFilter(TripStatus? Status, int? DriverId, int? VehicleId, DateOnly? From, DateOnly? To, int Page = 1, int PageSize = 20);
+public sealed record TripFilter(TripStatus? Status, int? DriverId, int? VehicleId, DateOnly? From, DateOnly? To, int Page = 1, int PageSize = 20, string? Q = null);
 
 // ---------- read models ----------
 public sealed record SalesOrderRow(int Id, string? Number, DateOnly Date, DateOnly? RequiredDate, int CustomerId, int CurrencyId,

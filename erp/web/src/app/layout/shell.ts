@@ -1,5 +1,8 @@
 import { Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
 import { Auth } from '../core/auth';
 import { I18n } from '../core/i18n';
 import { WRITE_ROLES } from '../core/models';
@@ -10,50 +13,41 @@ interface NavItem {
   roles?: readonly string[];
 }
 
+interface NavGroup {
+  key: string;
+  label: string;
+  items: NavItem[];
+  visible: boolean;
+}
+
+const OPEN_KEY = 'erp.navOpen';
+
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
   template: `
     <div class="shell" [class.nav-open]="navOpen()">
       <aside class="sidebar">
         <div class="brand"><img src="shannana-logo.png" alt="" width="53" height="40" (error)="$any($event.target).remove()" />{{ i18n.t('app.name') }}</div>
+        <div class="nav-search">
+          <input class="input" type="search" name="navSearch" [placeholder]="i18n.t('nav.find')" [ngModel]="navQuery()" (ngModelChange)="navQuery.set($event ?? '')" />
+        </div>
         <nav>
-          <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="navOpen.set(false)">{{ i18n.t('nav.dashboard') }}</a>
-
-          <div class="nav-group">{{ i18n.t('nav.masterData') }}</div>
-          @for (n of master; track n.path) {
-            <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
+          @if (!navQuery().trim()) {
+            <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" (click)="navOpen.set(false)">{{ i18n.t('nav.dashboard') }}</a>
           }
-
-          <div class="nav-group">{{ i18n.t('nav.inventory') }}</div>
-          @for (n of inventory; track n.path) {
-            <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
-          }
-
-          @if (canViewPurchasing) {
-            <div class="nav-group">{{ i18n.t('nav.purchasing') }}</div>
-            @for (n of purchasing; track n.path) {
-              <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
+          @for (g of groupsView(); track g.key) {
+            <button class="nav-group" type="button" [attr.aria-expanded]="g.open" (click)="toggle(g.key)">
+              <span>{{ i18n.t(g.label) }}</span>
+              <span class="chev" [class.open]="g.open" aria-hidden="true">▾</span>
+            </button>
+            @if (g.open) {
+              @for (n of g.items; track n.path) {
+                <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
+              }
             }
-          }
-
-          @if (canViewSales) {
-            <div class="nav-group">{{ i18n.t('nav.sales') }}</div>
-            @for (n of sales; track n.path) {
-              <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
-            }
-          }
-
-          @if (canViewAccounting) {
-            <div class="nav-group">{{ i18n.t('nav.accounting') }}</div>
-            @for (n of accounting; track n.path) {
-              <a [routerLink]="n.path" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t(n.label) }}</a>
-            }
-          }
-
-          @if (auth.hasAnyRole(['Admin'])) {
-            <div class="nav-group">{{ i18n.t('nav.admin') }}</div>
-            <a routerLink="/users" routerLinkActive="active" (click)="navOpen.set(false)">{{ i18n.t('nav.users') }}</a>
+          } @empty {
+            <p class="nav-empty">{{ i18n.t('common.empty') }}</p>
           }
         </nav>
       </aside>
@@ -76,6 +70,10 @@ interface NavItem {
 export class Shell {
   readonly auth = inject(Auth);
   readonly i18n = inject(I18n);
+  private readonly router = inject(Router);
+  readonly navQuery = signal('');
+  /** Groups the user has expanded (remembered between visits); the group of the current screen always opens. */
+  readonly openGroups = signal<string[]>(this.loadOpen());
   readonly navOpen = signal(false);
   readonly dark = signal(document.documentElement.dataset['theme'] === 'dark');
 
@@ -142,6 +140,62 @@ export class Shell {
     { path: '/reconciliation', label: 'nav.reconciliation' },
     { path: '/accounting-settings', label: 'nav.accountingSettings' },
   ];
+
+  private readonly admin: NavItem[] = [{ path: '/users', label: 'nav.users' }];
+
+  private get groups(): NavGroup[] {
+    return [
+      { key: 'master', label: 'nav.masterData', items: this.master, visible: true },
+      { key: 'inventory', label: 'nav.inventory', items: this.inventory, visible: true },
+      { key: 'purchasing', label: 'nav.purchasing', items: this.purchasing, visible: this.canViewPurchasing },
+      { key: 'sales', label: 'nav.sales', items: this.sales, visible: this.canViewSales },
+      { key: 'accounting', label: 'nav.accounting', items: this.accounting, visible: this.canViewAccounting },
+      { key: 'admin', label: 'nav.admin', items: this.admin, visible: this.auth.hasAnyRole(['Admin']) },
+    ];
+  }
+
+  constructor() {
+    this.router.events.pipe(filter((e): e is NavigationEnd => e instanceof NavigationEnd), takeUntilDestroyed()).subscribe((e) => this.revealCurrent(e.urlAfterRedirects));
+    this.revealCurrent(this.router.url);
+  }
+
+  private loadOpen(): string[] {
+    try {
+      const v = JSON.parse(localStorage.getItem(OPEN_KEY) ?? '[]');
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private saveOpen(v: string[]): void {
+    this.openGroups.set(v);
+    localStorage.setItem(OPEN_KEY, JSON.stringify(v));
+  }
+
+  /** Makes sure the group holding the current screen is open, so the active link is never hidden. */
+  private revealCurrent(url: string): void {
+    const path = url.split('?')[0];
+    const g = this.groups.find((x) => x.items.some((i) => path === i.path || path.startsWith(i.path + '/')));
+    if (g && !this.openGroups().includes(g.key)) this.saveOpen([...this.openGroups(), g.key]);
+  }
+
+  toggle(key: string): void {
+    const cur = this.openGroups();
+    this.saveOpen(cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key]);
+  }
+
+  /** Groups to draw: only those the role may see; while searching, only matching links and every matching group open. */
+  groupsView(): (NavGroup & { open: boolean })[] {
+    const q = this.navQuery().trim().toLowerCase();
+    return this.groups
+      .filter((g) => g.visible)
+      .map((g) => {
+        const items = q ? g.items.filter((i) => this.i18n.t(i.label).toLowerCase().includes(q)) : g.items;
+        return { ...g, items, open: q ? true : this.openGroups().includes(g.key) };
+      })
+      .filter((g) => g.items.length > 0);
+  }
 
   toggleTheme(): void {
     const next = this.dark() ? 'light' : 'dark';

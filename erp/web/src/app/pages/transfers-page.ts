@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { Api, parseApiError } from '../core/api';
 import { Auth } from '../core/auth';
 import { SearchSelect } from '../shared/search-select';
+import { ListSearch } from '../shared/list-search';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
 import { DocStatus, Paged, Transfer, TransferRow, WRITE_ROLES } from '../core/models';
@@ -13,11 +14,12 @@ const today = () => new Date().toISOString().slice(0, 10);
 /** Warehouse-to-warehouse transfers: draft, edit, confirm (posts stock) or cancel (reverses it). */
 @Component({
   selector: 'app-transfers-page',
-  imports: [FormsModule, SearchSelect],
+  imports: [FormsModule, SearchSelect, ListSearch],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.transfers') }}</h1>
       <div class="page-tools">
+        <app-list-search (search)="onQuery($event)" />
         <select class="input" [(ngModel)]="status" (ngModelChange)="reload()">
           <option value="">{{ i18n.t('inv.allStatuses') }}</option>
           @for (s of statuses; track s) {
@@ -179,6 +181,13 @@ export class TransfersPage implements OnInit {
   }
 
   /** Active warehouses, plus the currently selected one even if it was deactivated since. */
+  q = '';
+
+  onQuery(v: string): void {
+    this.q = v;
+    this.reload();
+  }
+
   reload(): void {
     this.page.set(1);
     this.load();
@@ -191,7 +200,7 @@ export class TransfersPage implements OnInit {
 
   private load(): void {
     this.loading.set(true);
-    this.api.get<Paged<TransferRow>>(`stocktransfers?page=${this.page()}&pageSize=20${this.status ? '&status=' + this.status : ''}`).subscribe({
+    this.api.get<Paged<TransferRow>>(`stocktransfers?page=${this.page()}&pageSize=20${this.status ? '&status=' + this.status : ''}${this.q ? '&q=' + encodeURIComponent(this.q) : ''}`).subscribe({
       next: (r) => {
         this.rows.set(r.items);
         this.total.set(r.total);

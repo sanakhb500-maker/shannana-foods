@@ -17,7 +17,7 @@ public sealed record DocumentFilter(DocumentStatus? Status, int? WarehouseId, st
 
 public sealed record BalanceFilter(int? WarehouseId, int? ItemId, string? Q, bool NonZeroOnly = true, int Page = 1, int PageSize = 50);
 
-public sealed record MovementFilter(int? WarehouseId, int? ItemId, DateOnly? From, DateOnly? To, string? DocumentType, int Page = 1, int PageSize = 50);
+public sealed record MovementFilter(int? WarehouseId, int? ItemId, DateOnly? From, DateOnly? To, string? DocumentType, int Page = 1, int PageSize = 50, string? Q = null);
 
 // ---------- read models ----------
 public sealed record BalanceRow(

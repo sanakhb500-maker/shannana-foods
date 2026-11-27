@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { Api, parseApiError } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n } from '../core/i18n';
+import { TableFilter } from '../shared/list-search';
 import { AccountDto, BalanceSheet, IncomeStatement, Ledger, ReconciliationRow, TrialBalance, WRITE_ROLES } from '../core/models';
 
 /** Shared by the report pages: a localized account name and a "1,234.00 Dr/Cr" formatter for net debit amounts. */
@@ -30,11 +31,12 @@ abstract class ReportBase {
 
 @Component({
   selector: 'app-trial-balance-page',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, TableFilter],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.trialBalance') }}</h1>
       <div class="page-tools">
+        <app-table-filter />
         <input class="input date" type="date" [(ngModel)]="from" (ngModelChange)="load()" [title]="i18n.t('inv.from')" />
         <input class="input date" type="date" [(ngModel)]="to" (ngModelChange)="load()" [title]="i18n.t('inv.to')" />
       </div>
@@ -302,9 +304,12 @@ export class BalanceSheetPage extends ReportBase implements OnInit {
 /** Control accounts in the general ledger against what the sub-ledgers (stock, suppliers, customers) say. */
 @Component({
   selector: 'app-reconciliation-page',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, TableFilter],
   template: `
-    <header class="page-head"><h1>{{ i18n.t('nav.reconciliation') }}</h1></header>
+    <header class="page-head">
+      <h1>{{ i18n.t('nav.reconciliation') }}</h1>
+      <div class="page-tools"><app-table-filter /></div>
+    </header>
     @if (message()) {
       <div class="alert error">{{ message() }}</div>
     }

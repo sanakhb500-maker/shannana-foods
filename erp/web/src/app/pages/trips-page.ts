@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
 import { Api, parseApiError } from '../core/api';
 import { Auth } from '../core/auth';
+import { ListSearch } from '../shared/list-search';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
 import { DeliveryRow, Paged, StopStatus, Trip, TripRow, TripStatus, WRITE_ROLES } from '../core/models';
@@ -16,11 +17,12 @@ const today = () => new Date().toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-trips-page',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, ListSearch],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.trips') }}</h1>
       <div class="page-tools">
+        <app-list-search (search)="onQuery($event)" />
         <select class="input" [(ngModel)]="status" (ngModelChange)="reload()">
           <option value="">{{ i18n.t('inv.allStatuses') }}</option>
           @for (s of statuses; track s) {
@@ -252,6 +254,13 @@ export class TripsPage implements OnInit {
     this.load();
   }
 
+  q = '';
+
+  onQuery(v: string): void {
+    this.q = v;
+    this.reload();
+  }
+
   reload(): void {
     this.page.set(1);
     this.load();
@@ -267,6 +276,7 @@ export class TripsPage implements OnInit {
     const qs = [`page=${this.page()}`, 'pageSize=20'];
     if (this.status) qs.push(`status=${this.status}`);
     if (this.driverFilter) qs.push(`driverId=${this.driverFilter}`);
+    if (this.q) qs.push(`q=${encodeURIComponent(this.q)}`);
     this.api.get<Paged<TripRow>>(`trips?${qs.join('&')}`).subscribe({
       next: (r) => {
         this.rows.set(r.items);

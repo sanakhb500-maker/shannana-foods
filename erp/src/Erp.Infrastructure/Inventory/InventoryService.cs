@@ -271,6 +271,12 @@ public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster po
         if (f.From is { } from) q = q.Where(x => x.m.Date >= from);
         if (f.To is { } to) q = q.Where(x => x.m.Date <= to);
         if (!string.IsNullOrWhiteSpace(f.DocumentType)) { var dt = f.DocumentType.Trim(); q = q.Where(x => x.m.DocumentType == dt); }
+        if (!string.IsNullOrWhiteSpace(f.Q))
+        {
+            var s = f.Q.Trim();
+            q = q.Where(x => x.i.Code.Contains(s) || x.i.NameAr.Contains(s) || x.i.NameEn.Contains(s) || (x.m.DocumentNumber != null && x.m.DocumentNumber.Contains(s))
+                             || x.w.Code.Contains(s) || x.w.NameAr.Contains(s) || x.w.NameEn.Contains(s));
+        }
 
         var (page, size) = Paging(f.Page, f.PageSize, 500);
         var total = await q.CountAsync(ct);

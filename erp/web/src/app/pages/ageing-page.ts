@@ -2,15 +2,19 @@ import { DecimalPipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Api, parseApiError } from '../core/api';
+import { TableFilter } from '../shared/list-search';
 import { I18n } from '../core/i18n';
 import { AgeingRow } from '../core/models';
 
 /** Who owes how much and for how long (suppliers: what we owe; customers: what is owed to us). Local currency, by days past due. */
 @Component({
   selector: 'app-ageing-page',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, TableFilter],
   template: `
-    <header class="page-head"><h1>{{ i18n.t(side === 'supplier' ? 'nav.supplierAgeing' : 'nav.customerAgeing') }}</h1></header>
+    <header class="page-head">
+      <h1>{{ i18n.t(side === 'supplier' ? 'nav.supplierAgeing' : 'nav.customerAgeing') }}</h1>
+      <div class="page-tools"><app-table-filter /></div>
+    </header>
     @if (message()) {
       <div class="alert error">{{ message() }}</div>
     }

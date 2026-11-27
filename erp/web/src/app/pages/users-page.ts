@@ -2,16 +2,18 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, parseApiError } from '../core/api';
 import { Auth } from '../core/auth';
+import { TableFilter } from '../shared/list-search';
 import { I18n } from '../core/i18n';
 import { ROLES, UserDto } from '../core/models';
 
 @Component({
   selector: 'app-users-page',
-  imports: [FormsModule],
+  imports: [FormsModule, TableFilter],
   template: `
     <header class="page-head">
       <h1>{{ i18n.t('nav.users') }}</h1>
       <div class="page-tools">
+        <app-table-filter />
         <button class="btn primary" type="button" (click)="openNew()">+ {{ i18n.t('common.add') }}</button>
       </div>
     </header>

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Api, parseApiError } from '../core/api';
 import { SearchSelect } from '../shared/search-select';
+import { TableFilter } from '../shared/list-search';
 import { I18n } from '../core/i18n';
 import { Lookups } from '../core/lookups';
 import { CustomerBalanceRow } from '../core/models';
@@ -14,9 +15,12 @@ interface CustomerStatement { customerId: number; openingBalance: number; rows: 
 /** What each customer owes (local currency): confirmed invoices minus confirmed returns and receipts. */
 @Component({
   selector: 'app-customer-balances-page',
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, TableFilter],
   template: `
-    <header class="page-head"><h1>{{ i18n.t('nav.customerBalances') }}</h1></header>
+    <header class="page-head">
+      <h1>{{ i18n.t('nav.customerBalances') }}</h1>
+      <div class="page-tools"><app-table-filter /></div>
+    </header>
     @if (message()) {
       <div class="alert error">{{ message() }}</div>
     }
