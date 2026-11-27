@@ -39,3 +39,4 @@ erp/web/node_modules/
 erp/web/.angular/
 erp/**/appsettings.*.local.json
 *.user
+erp/src/Erp.Api/App_Data/
