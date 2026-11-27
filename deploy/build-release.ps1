@@ -49,6 +49,7 @@ Step 'Server scripts'
 Copy-Item (Join-Path $PSScriptRoot 'server') (Join-Path $stage 'server') -Recurse
 Copy-Item (Join-Path $PSScriptRoot 'config.example.psd1') (Join-Path $stage 'server\config.example.psd1')
 Copy-Item (Join-Path $PSScriptRoot 'README.md') (Join-Path $stage 'README.md')
+Copy-Item (Join-Path $PSScriptRoot 'INSTALL-STEPS.md') (Join-Path $stage 'INSTALL-STEPS.md')
 
 $sha = 'nogit'
 try { $sha = (git -C $repo rev-parse --short HEAD).Trim(); if (git -C $repo status --porcelain) { $sha += '-dirty' } } catch { }
