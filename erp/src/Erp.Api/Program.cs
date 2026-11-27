@@ -11,6 +11,7 @@ using Erp.Application.Purchasing;
 using Erp.Application.Sales;
 using Erp.Infrastructure.Accounting;
 using Erp.Infrastructure.Auth;
+using Erp.Infrastructure.Common;
 using Erp.Infrastructure.Inventory;
 using Erp.Infrastructure.Identity;
 using Erp.Infrastructure.Persistence;
@@ -37,6 +38,7 @@ var connectionString = cfg.GetConnectionString("Default")
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<StockPoster>();
+builder.Services.AddScoped<DocumentNumbering>();
 builder.Services.AddScoped<JournalPoster>();
 builder.Services.AddScoped<IAccountingService, AccountingService>();
 builder.Services.AddScoped<IInventoryService, InventoryService>();
@@ -106,7 +108,9 @@ builder.Services.AddRateLimiter(o =>
 builder.Services.AddValidatorsFromAssemblyContaining<CurrencyValidator>();
 builder.Services.AddOpenApi();
 
-builder.Services.AddControllers()
+FluentValidation.ValidatorOptions.Global.DisplayNameResolver = (_, member, _) => FieldNames.For(member?.Name);
+
+builder.Services.AddControllers(o => o.Filters.Add<LocalizeFailuresFilter>())
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
     .ConfigureApiBehaviorOptions(o =>
         o.InvalidModelStateResponseFactory = ctx =>
@@ -119,6 +123,7 @@ builder.Services.AddControllers()
 var app = builder.Build();
 
 // ---------- pipeline ----------
+app.UseMiddleware<LanguageMiddleware>();
 app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
 {
     var ex = ctx.Features.Get<IExceptionHandlerFeature>()?.Error;
@@ -133,7 +138,7 @@ app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
     if (status == StatusCodes.Status500InternalServerError)
         app.Logger.LogError(ex, "Unhandled exception for {Path}", ctx.Request.Path);
     ctx.Response.StatusCode = status;
-    await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail(message));
+    await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail(MessageCatalog.Localize(message, LanguageMiddleware.Of(ctx))));
 }));
 
 app.UseDefaultFiles();

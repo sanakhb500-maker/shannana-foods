@@ -402,7 +402,7 @@ public class AccountingTests(ErpFactory factory) : IClassFixture<ErpFactory>
         var draft = await OkAsync(s, HttpMethod.Post, "/api/v1/journalentries",
             Body(new { accountId = cash, debit = 100, credit = 0 }, new { accountId = equity, debit = 0, credit = 100 }), HttpStatusCode.Created);
         var id = draft.GetProperty("id").GetInt32();
-        Assert.StartsWith("JV-", draft.GetProperty("number").GetString());
+        Assert.Equal(JsonValueKind.Null, draft.GetProperty("number").ValueKind); // numbered when posted
         Assert.Equal("Draft", draft.GetProperty("status").GetString());
         Assert.Equal(0m, await snap.DeltaAsync("1100")); // drafts do not count
 
@@ -417,6 +417,7 @@ public class AccountingTests(ErpFactory factory) : IClassFixture<ErpFactory>
 
         var posted = await OkAsync(s, HttpMethod.Post, $"/api/v1/journalentries/{id}/post");
         Assert.Equal("Posted", posted.GetProperty("status").GetString());
+        Assert.StartsWith("JV-", posted.GetProperty("number").GetString());
         Assert.Equal(120m, await snap.DeltaAsync("1100"));
         Assert.Equal(-120m, await snap.DeltaAsync("3100"));
 

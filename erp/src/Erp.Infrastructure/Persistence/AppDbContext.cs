@@ -60,6 +60,7 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalLine> JournalLines => Set<JournalLine>();
     public DbSet<AccountingSetting> AccountingSettings => Set<AccountingSetting>();
+    public DbSet<DocumentSequence> DocumentSequences => Set<DocumentSequence>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -170,6 +171,13 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
         ConfigurePurchasing(b);
         ConfigureSales(b);
         ConfigureAccounting(b);
+
+        b.Entity<DocumentSequence>(e =>
+        {
+            e.HasKey(x => x.Key);
+            e.Property(x => x.Key).HasMaxLength(10);
+            e.Property(x => x.RowVersion).IsRowVersion();
+        });
     }
 
     private static void ConfigureAccounting(ModelBuilder b)
@@ -188,7 +196,8 @@ public class AppDbContext : IdentityDbContext<AppUser, AppRole, int>
 
         b.Entity<JournalEntry>(e =>
         {
-            e.Ignore(x => x.Number);
+            e.HasIndex(x => x.Number).IsUnique().HasFilter("[Number] IS NOT NULL");
+            e.Property(x => x.Number).HasMaxLength(30);
             e.HasIndex(x => x.Date);
             e.HasIndex(x => new { x.SourceType, x.SourceId });
             e.Property(x => x.Description).HasMaxLength(300);

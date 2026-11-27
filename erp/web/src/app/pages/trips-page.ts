@@ -60,7 +60,7 @@ const today = () => new Date().toISOString().slice(0, 10);
         <tbody>
           @for (r of rows(); track r.id) {
             <tr class="clickable" (click)="open(r.id)">
-              <td>{{ r.number }}</td>
+              <td>{{ r.number ?? '—' }}</td>
               <td>{{ r.date }}</td>
               <td>{{ lookups.driverLabel(r.driverId) }}</td>
               <td>{{ lookups.vehicleLabel(r.vehicleId) }}</td>

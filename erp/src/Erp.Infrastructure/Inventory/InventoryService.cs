@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Erp.Infrastructure.Inventory;
 
-public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster poster, JournalPoster gl) : IInventoryService
+public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster poster, JournalPoster gl, DocumentNumbering numbers) : IInventoryService
 {
     private async Task<int> SaveAsync(CancellationToken ct)
     {
@@ -65,8 +65,6 @@ public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster po
         };
         db.StockTransfers.Add(t);
         await SaveAsync(ct);
-        t.Number = $"TRF-{t.Id:D6}"; // id-based number: unique and race-free
-        await SaveAsync(ct);
         return t;
     }
 
@@ -87,6 +85,7 @@ public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster po
     {
         var t = await LoadTransferAsync(id, ct);
         EnsureDraft(t.Status);
+        t.Number = await numbers.NextAsync(SequenceKeys.Transfer, ct);
         await EnsureActiveAsync([t.FromWarehouseId, t.ToWarehouseId], t.Lines.Select(l => l.ItemId), ct);
 
         var src = new PostingSource(t.Date, DocumentTypes.Transfer, t.Id, t.Number);
@@ -149,8 +148,6 @@ public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster po
         };
         db.StockAdjustments.Add(a);
         await SaveAsync(ct);
-        a.Number = $"ADJ-{a.Id:D6}";
-        await SaveAsync(ct);
         return a;
     }
 
@@ -171,6 +168,7 @@ public class InventoryService(AppDbContext db, ICurrentUser user, StockPoster po
     {
         var a = await LoadAdjustmentAsync(id, ct);
         EnsureDraft(a.Status);
+        a.Number = await numbers.NextAsync(SequenceKeys.Adjustment, ct);
         await EnsureActiveAsync([a.WarehouseId], a.Lines.Select(l => l.ItemId), ct);
 
         var src = new PostingSource(a.Date, DocumentTypes.Adjustment, a.Id, a.Number);

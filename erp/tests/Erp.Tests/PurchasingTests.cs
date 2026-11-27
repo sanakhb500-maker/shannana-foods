@@ -124,7 +124,9 @@ public class PurchasingTests(ErpFactory factory) : IClassFixture<ErpFactory>
             PoBody(await NewSupplierAsync(s), Usd, 0.71m, await NewItemAsync(s), 10, 5), HttpStatusCode.Created);
         Assert.Equal(50m, po.GetProperty("totalAmount").GetDecimal());
         Assert.Equal(0.71m, po.GetProperty("exchangeRate").GetDecimal());
-        Assert.StartsWith("PO-", po.GetProperty("number").GetString());
+        Assert.Equal(JsonValueKind.Null, po.GetProperty("number").ValueKind);
+        var confirmed = await OkAsync(s, HttpMethod.Post, $"/api/v1/purchaseorders/{po.GetProperty("id").GetInt32()}/confirm");
+        Assert.StartsWith("PO-", confirmed.GetProperty("number").GetString());
         Assert.Equal("Draft", po.GetProperty("status").GetString());
     }
 

@@ -514,6 +514,26 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.ToTable("DistributionTrips");
                 });
 
+            modelBuilder.Entity("Erp.Domain.Entities.DocumentSequence", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<int>("LastNumber")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Key");
+
+                    b.ToTable("DocumentSequences");
+                });
+
             modelBuilder.Entity("Erp.Domain.Entities.Driver", b =>
                 {
                     b.Property<int>("Id")
@@ -860,6 +880,10 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<string>("Number")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
                     b.Property<DateTime?>("PostedAt")
                         .HasColumnType("datetime2");
 
@@ -890,6 +914,10 @@ namespace Erp.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Date");
+
+                    b.HasIndex("Number")
+                        .IsUnique()
+                        .HasFilter("[Number] IS NOT NULL");
 
                     b.HasIndex("ReversalOfId");
 

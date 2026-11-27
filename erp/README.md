@@ -47,7 +47,7 @@ Single-origin build (what production uses): `cd web && npx ng build` writes into
 | `Seed:AdminEmail` / `Seed:AdminPassword` | first admin, created only when no users exist |
 | `Inventory:AllowNegativeStock` | `false` by default: an issue/transfer that would take stock below zero is rejected |
 | `RateLimit:LoginPermitLimit` | failed+successful logins allowed per IP per 15 minutes (default 10) |
-| `Seed:LocalCurrencyCode` | local (base) currency, default `JOD`; **fixed after the first run** |
+| `Seed:LocalCurrencyCode` | local (base) currency, default `SYP` (new Syrian pound; USD is the foreign currency); **fixed after the first run** |
 
 For production set these through environment variables (`Jwt__Key`, `ConnectionStrings__Default`, ...) or user-secrets, never in committed files.
 
@@ -105,6 +105,10 @@ For production set these through environment variables (`Jwt__Key`, `ConnectionS
 - **Price variance:** if a supplier invoice price differs from the receipt price, the difference stays in GRNI until settled (no variance account yet). Non-stock purchases (services) are not supported.
 - **Starting point:** accounting begins with this migration. Documents confirmed before it have no entries (this is a development database; a production roll-out would need a back-fill).
 - **Access:** Admin and Accountant only (reports, journal, settings). The chart of accounts itself is readable by everyone signed in; accounts used by automatic postings cannot be deactivated or change type.
+
+## Cross-cutting rules
+- **Gap-free numbering.** A draft has no number. The number (PO-000012, SINV-000007, JV-000031 ...) is taken from a per-family counter at CONFIRMATION, inside the same transaction as the document, so a failed or cancelled draft consumes nothing. The counter row has a row-version: two people confirming the same family at the same instant cannot share a number (the loser gets a retry message). Trips are numbered when created (they are never confirmed).
+- **Error messages follow the user's language.** The Angular app sends `X-Lang: ar|en` on every call. The code throws plain English messages; `MessageCatalog` translates them at the API boundary (a result filter, the exception handler and the CSRF check), and FluentValidation's own messages and field names come out in Arabic via the request culture and `FieldNames`. A test scans the source and fails if any message literal has no Arabic entry, so a new message cannot ship untranslated.
 
 ## Auth and roles
 JWT in an HttpOnly cookie (`erp_auth`) plus a double-submit CSRF token (`erp_csrf` cookie echoed in `X-CSRF-Token`) on writes.

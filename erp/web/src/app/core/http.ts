@@ -3,6 +3,7 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { Auth } from './auth';
+import { I18n } from './i18n';
 
 function readCookie(name: string): string {
   const m = document.cookie.split('; ').find((c) => c.startsWith(name + '='));
@@ -13,13 +14,15 @@ function readCookie(name: string): string {
 export const apiInterceptor: HttpInterceptorFn = (req, next) => {
   const router = inject(Router);
   const auth = inject(Auth);
+  const i18n = inject(I18n);
   if (!req.url.startsWith('/api/')) return next(req);
 
   const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
   const csrf = readCookie('erp_csrf');
   const outgoing = req.clone({
     withCredentials: true,
-    setHeaders: unsafe && csrf ? { 'X-CSRF-Token': csrf } : {},
+    // X-Lang makes the server answer errors in the language the user is looking at
+    setHeaders: { 'X-Lang': i18n.lang(), ...(unsafe && csrf ? { 'X-CSRF-Token': csrf } : {}) },
   });
 
   return next(outgoing).pipe(

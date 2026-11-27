@@ -27,8 +27,8 @@ public class Account : AuditableEntity
 
 public class JournalEntry : AuditableEntity
 {
-    /// <summary>Display number, derived from the id (JV-000123): unique and needs no second save.</summary>
-    public string Number => $"JV-{Id:D6}";
+    /// <summary>Assigned when the entry is posted (JV-000123), gap-free. A manual draft has none yet.</summary>
+    public string? Number { get; set; }
     public DateOnly Date { get; set; }
     public string Description { get; set; } = "";
     /// <summary>"Manual" or the document type that produced the entry (see <see cref="SourceTypes"/>).</summary>

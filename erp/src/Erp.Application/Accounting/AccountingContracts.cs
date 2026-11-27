@@ -14,7 +14,7 @@ public sealed record LockDateInput(DateOnly? LockDate);
 public sealed record JournalFilter(JournalStatus? Status, string? SourceType, DateOnly? From, DateOnly? To, string? Q, int Page = 1, int PageSize = 20);
 
 // ---------- read models ----------
-public sealed record JournalRow(int Id, string Number, DateOnly Date, string Description, string SourceType, int? SourceId, JournalStatus Status, decimal Total);
+public sealed record JournalRow(int Id, string? Number, DateOnly Date, string Description, string SourceType, int? SourceId, JournalStatus Status, decimal Total);
 
 /// <summary>Amounts are net debit (debit - credit): positive = debit balance, negative = credit balance.</summary>
 public sealed record TrialBalanceRow(int AccountId, string Code, string NameAr, string NameEn, AccountType Type,
@@ -23,7 +23,7 @@ public sealed record TrialBalanceRow(int AccountId, string Code, string NameAr, 
 public sealed record TrialBalance(DateOnly? From, DateOnly? To, IReadOnlyList<TrialBalanceRow> Rows,
     decimal TotalDebit, decimal TotalCredit, decimal ClosingDebit, decimal ClosingCredit, bool IsBalanced);
 
-public sealed record LedgerRow(DateOnly Date, int EntryId, string EntryNumber, string Description, string SourceType,
+public sealed record LedgerRow(DateOnly Date, int EntryId, string? EntryNumber, string Description, string SourceType,
     decimal Debit, decimal Credit, decimal Balance, PartyType PartyType, int? PartyId);
 
 public sealed record Ledger(int AccountId, string Code, string NameAr, string NameEn, AccountType Type, DateOnly? From, DateOnly? To,

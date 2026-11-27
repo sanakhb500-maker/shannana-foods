@@ -11,7 +11,7 @@ using static Erp.Infrastructure.Common.DocumentRules;
 
 namespace Erp.Infrastructure.Sales;
 
-public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster, JournalPoster gl) : ISalesService
+public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster, JournalPoster gl, DocumentNumbering numbers) : ISalesService
 {
     // =====================================================================
     //  Shared helpers
@@ -125,8 +125,6 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         };
         db.SalesOrders.Add(so);
         await SaveAsync(ct);
-        so.Number = $"SO-{so.Id:D6}";
-        await SaveAsync(ct);
         return so;
     }
 
@@ -151,6 +149,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var so = await LoadOrderAsync(id, ct);
         EnsureDraft(so.Status);
+        so.Number = await numbers.NextAsync(SequenceKeys.SalesOrder, ct);
         await EnsureCustomerAsync(so.CustomerId, ct);
         await db.EnsureItemsAsync(so.Lines.Select(l => l.ItemId), ct);
         so.Status = DocumentStatus.Confirmed;
@@ -238,8 +237,6 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         };
         db.DeliveryNotes.Add(d);
         await SaveAsync(ct);
-        d.Number = $"DLV-{d.Id:D6}";
-        await SaveAsync(ct);
         return d;
     }
 
@@ -265,6 +262,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var d = await LoadDeliveryAsync(id, ct);
         EnsureDraft(d.Status);
+        d.Number = await numbers.NextAsync(SequenceKeys.Delivery, ct);
         await EnsureCustomerAsync(d.CustomerId, ct);
         await db.EnsureWarehouseAsync(d.WarehouseId, ct);
         await db.EnsureItemsAsync(d.Lines.Select(l => l.ItemId), ct);
@@ -391,8 +389,6 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         };
         db.SalesInvoices.Add(inv);
         await SaveAsync(ct);
-        inv.Number = $"SINV-{inv.Id:D6}";
-        await SaveAsync(ct);
         return inv;
     }
 
@@ -418,6 +414,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var inv = await LoadInvoiceAsync(id, ct);
         EnsureDraft(inv.Status);
+        inv.Number = await numbers.NextAsync(SequenceKeys.SalesInvoice, ct);
         await EnsureCustomerAsync(inv.CustomerId, ct);
         await db.EnsureItemsAsync(inv.Lines.Select(l => l.ItemId), ct);
 
@@ -524,8 +521,6 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         };
         db.SalesReturns.Add(r);
         await SaveAsync(ct);
-        r.Number = $"SRN-{r.Id:D6}";
-        await SaveAsync(ct);
         return r;
     }
 
@@ -551,6 +546,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var r = await LoadReturnAsync(id, ct);
         EnsureDraft(r.Status);
+        r.Number = await numbers.NextAsync(SequenceKeys.SalesReturn, ct);
         await EnsureCustomerAsync(r.CustomerId, ct);
         await db.EnsureWarehouseAsync(r.WarehouseId, ct);
         await db.EnsureItemsAsync(r.Lines.Select(l => l.ItemId), ct);
@@ -634,8 +630,6 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         };
         db.CustomerReceipts.Add(r);
         await SaveAsync(ct);
-        r.Number = $"RCT-{r.Id:D6}";
-        await SaveAsync(ct);
         return r;
     }
 
@@ -655,6 +649,7 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
     {
         var r = await LoadReceiptAsync(id, ct);
         EnsureDraft(r.Status);
+        r.Number = await numbers.NextAsync(SequenceKeys.CustomerReceipt, ct);
         await EnsureCustomerAsync(r.CustomerId, ct);
         var received = R4(r.Amount * r.ExchangeRate);
         await gl.PostAsync(SourceTypes.CustomerReceipt, r.Id, r.Date, $"Customer receipt {r.Number}", ct,
@@ -729,7 +724,9 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
                         && (t.DriverId == i.DriverId || t.VehicleId == i.VehicleId))
             .Select(t => new { t.Number, SameDriver = t.DriverId == i.DriverId }).FirstOrDefaultAsync(ct);
         if (clash is not null)
-            throw new BusinessRuleException($"The {(clash.SameDriver ? "driver" : "vehicle")} already has trip {clash.Number} on that date.");
+            throw new BusinessRuleException(clash.SameDriver
+                ? $"The driver already has trip {clash.Number} on that date."
+                : $"The vehicle already has trip {clash.Number} on that date.");
 
         var ids = i.DeliveryNoteIds;
         var found = await db.DeliveryNotes.AsNoTracking().Where(d => ids.Contains(d.Id)).Select(d => new { d.Id, d.Number, d.Status }).ToListAsync(ct);
@@ -794,7 +791,10 @@ public class SalesService(AppDbContext db, ICurrentUser user, StockPoster poster
         var notConfirmed = await db.DeliveryNotes.AsNoTracking().Where(d => ids.Contains(d.Id) && d.Status != DocumentStatus.Confirmed)
             .Select(d => d.Number).ToListAsync(ct);
         if (notConfirmed.Count > 0)
-            throw new BusinessRuleException($"These delivery notes must be confirmed before the trip starts: {string.Join(", ", notConfirmed)}.");
+        {
+            var list = string.Join(", ", notConfirmed);
+            throw new BusinessRuleException($"These delivery notes must be confirmed before the trip starts: {list}.");
+        }
 
         t.Status = TripStatus.InTransit;
         t.StartedAt = DateTime.UtcNow;

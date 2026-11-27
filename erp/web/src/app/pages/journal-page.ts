@@ -60,7 +60,7 @@ const SOURCES = ['Manual', 'GoodsReceipt', 'PurchaseInvoice', 'SupplierPayment',
         <tbody>
           @for (r of rows(); track r.id) {
             <tr class="clickable" (click)="open(r.id)">
-              <td>{{ r.number }}</td>
+              <td>{{ r.number ?? '—' }}</td>
               <td>{{ r.date }}</td>
               <td>{{ r.description }}</td>
               <td>{{ i18n.t('src.' + r.sourceType) }}</td>

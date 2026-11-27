@@ -141,12 +141,13 @@ public class InventoryTests(ErpFactory factory) : IClassFixture<ErpFactory>
 
         var t = await OkAsync(s, HttpMethod.Post, "/api/v1/stocktransfers", TransferBody(a, b, item, 4), HttpStatusCode.Created);
         var id = t.GetProperty("id").GetInt32();
-        Assert.StartsWith("TRF-", t.GetProperty("number").GetString());
+        Assert.Equal(JsonValueKind.Null, t.GetProperty("number").ValueKind); // drafts have no number yet
         Assert.Equal("Draft", t.GetProperty("status").GetString());
         Assert.Equal((20m, 6.5m), await BalanceAsync(s, a, item)); // draft does not touch stock
 
         var confirmed = await OkAsync(s, HttpMethod.Post, $"/api/v1/stocktransfers/{id}/confirm");
         Assert.Equal("Confirmed", confirmed.GetProperty("status").GetString());
+        Assert.StartsWith("TRF-", confirmed.GetProperty("number").GetString()); // numbered on confirmation
         Assert.Equal((16m, 6.5m), await BalanceAsync(s, a, item));
         Assert.Equal((4m, 6.5m), await BalanceAsync(s, b, item));
 

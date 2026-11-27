@@ -109,7 +109,7 @@ export class DocPage implements OnInit {
       case 'currency': return this.lookups.currencyLabel(v);
       case 'progress': return this.i18n.t('prog.' + v);
       case 'method': return this.i18n.t('pm.' + v);
-      default: return v === null || v === undefined ? '' : String(v);
+      default: return v === null || v === undefined || v === '' ? (c.key === 'number' ? '—' : '') : String(v); // drafts have no number yet
     }
   }
 

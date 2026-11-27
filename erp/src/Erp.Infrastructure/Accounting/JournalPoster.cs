@@ -1,5 +1,6 @@
 using Erp.Application.Common;
 using Erp.Domain.Entities;
+using Erp.Infrastructure.Common;
 using Erp.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,7 +14,7 @@ public readonly record struct PostLine(string Role, decimal Debit, decimal Credi
 /// on the shared scoped DbContext: the document use case commits them with its single SaveChanges, so a document and its
 /// accounting entry are atomic.
 /// </summary>
-public sealed class JournalPoster(AppDbContext db, ICurrentUser user)
+public sealed class JournalPoster(AppDbContext db, ICurrentUser user, DocumentNumbering numbers)
 {
     private Dictionary<string, int>? _roles;
     private DateOnly? _lockDate;
@@ -53,7 +54,7 @@ public sealed class JournalPoster(AppDbContext db, ICurrentUser user)
         await EnsureOpenAsync(date, ct);
         var entry = new JournalEntry
         {
-            Date = date, Description = description, SourceType = sourceType, SourceId = sourceId, Status = JournalStatus.Posted,
+            Number = await numbers.NextAsync(SequenceKeys.Journal, ct), Date = date, Description = description, SourceType = sourceType, SourceId = sourceId, Status = JournalStatus.Posted,
             PostedAt = DateTime.UtcNow, PostedBy = user.UserName,
         };
         foreach (var l in real)
@@ -75,16 +76,16 @@ public sealed class JournalPoster(AppDbContext db, ICurrentUser user)
         await EnsureOpenAsync(Today, ct);
         foreach (var o in originals)
         {
-            db.JournalEntries.Add(ReversalOf(o, Today, description, user.UserName));
+            db.JournalEntries.Add(ReversalOf(o, Today, description, user.UserName, await numbers.NextAsync(SequenceKeys.Journal, ct)));
             o.Status = JournalStatus.Reversed;
         }
     }
 
-    internal static JournalEntry ReversalOf(JournalEntry original, DateOnly date, string description, string? by)
+    internal static JournalEntry ReversalOf(JournalEntry original, DateOnly date, string description, string? by, string number)
     {
         var rev = new JournalEntry
         {
-            Date = date, Description = description, SourceType = original.SourceType, SourceId = original.SourceId, Status = JournalStatus.Posted,
+            Number = number, Date = date, Description = description, SourceType = original.SourceType, SourceId = original.SourceId, Status = JournalStatus.Posted,
             ReversalOfId = original.Id, PostedAt = DateTime.UtcNow, PostedBy = by,
         };
         foreach (var l in original.Lines)

@@ -47,7 +47,7 @@ public sealed class CsrfMiddleware(RequestDelegate next)
             if (!sameOrigin || !tokenOk)
             {
                 ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
-                await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail("CSRF validation failed."));
+                await ctx.Response.WriteAsJsonAsync(ApiResponse.Fail(MessageCatalog.Localize("CSRF validation failed.", LanguageMiddleware.Of(ctx))));
                 return;
             }
         }

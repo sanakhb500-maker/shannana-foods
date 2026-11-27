@@ -225,8 +225,8 @@ public class SalesTests(ErpFactory factory) : IClassFixture<ErpFactory>
             lines = new[] { new { itemId = item, quantity = 2, unitPrice = 7 } },
         }, HttpStatusCode.Created);
         var retId = ret.GetProperty("id").GetInt32();
-        Assert.StartsWith("SRN-", ret.GetProperty("number").GetString());
-        await OkAsync(s, HttpMethod.Post, $"/api/v1/salesreturns/{retId}/confirm");
+        Assert.Equal(JsonValueKind.Null, ret.GetProperty("number").ValueKind);
+        Assert.StartsWith("SRN-", (await OkAsync(s, HttpMethod.Post, $"/api/v1/salesreturns/{retId}/confirm")).GetProperty("number").GetString());
         Assert.Equal((12m, 4m), await BalanceAsync(s, wh, item)); // back at the 4.00 average, so the average is not distorted
         Assert.Equal(56m, await CustomerBalanceAsync(s, customer)); // 70 - 2 x 7
 

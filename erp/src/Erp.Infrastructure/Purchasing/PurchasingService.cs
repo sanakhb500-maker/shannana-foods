@@ -11,7 +11,7 @@ using static Erp.Infrastructure.Common.DocumentRules;
 
 namespace Erp.Infrastructure.Purchasing;
 
-public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster poster, JournalPoster gl) : IPurchasingService
+public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster poster, JournalPoster gl, DocumentNumbering numbers) : IPurchasingService
 {
     // =====================================================================
     //  Shared helpers
@@ -117,8 +117,6 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         };
         db.PurchaseOrders.Add(po);
         await SaveAsync(ct);
-        po.Number = $"PO-{po.Id:D6}";
-        await SaveAsync(ct);
         return po;
     }
 
@@ -143,6 +141,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     {
         var po = await LoadOrderAsync(id, ct);
         EnsureDraft(po.Status);
+        po.Number = await numbers.NextAsync(SequenceKeys.PurchaseOrder, ct);
         await EnsureSupplierAsync(po.SupplierId, ct);
         await db.EnsureItemsAsync(po.Lines.Select(l => l.ItemId), ct);
         po.Status = DocumentStatus.Confirmed;
@@ -215,8 +214,6 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         };
         db.GoodsReceipts.Add(r);
         await SaveAsync(ct);
-        r.Number = $"GRN-{r.Id:D6}";
-        await SaveAsync(ct);
         return r;
     }
 
@@ -242,6 +239,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     {
         var r = await LoadReceiptAsync(id, ct);
         EnsureDraft(r.Status);
+        r.Number = await numbers.NextAsync(SequenceKeys.GoodsReceipt, ct);
         await EnsureSupplierAsync(r.SupplierId, ct);
         await db.EnsureWarehouseAsync(r.WarehouseId, ct);
         await db.EnsureItemsAsync(r.Lines.Select(l => l.ItemId), ct);
@@ -366,8 +364,6 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         };
         db.PurchaseInvoices.Add(inv);
         await SaveAsync(ct);
-        inv.Number = $"PINV-{inv.Id:D6}";
-        await SaveAsync(ct);
         return inv;
     }
 
@@ -393,6 +389,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     {
         var inv = await LoadInvoiceAsync(id, ct);
         EnsureDraft(inv.Status);
+        inv.Number = await numbers.NextAsync(SequenceKeys.PurchaseInvoice, ct);
         await EnsureSupplierAsync(inv.SupplierId, ct);
         await db.EnsureItemsAsync(inv.Lines.Select(l => l.ItemId), ct);
 
@@ -481,8 +478,6 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
         };
         db.SupplierPayments.Add(p);
         await SaveAsync(ct);
-        p.Number = $"PAY-{p.Id:D6}";
-        await SaveAsync(ct);
         return p;
     }
 
@@ -502,6 +497,7 @@ public class PurchasingService(AppDbContext db, ICurrentUser user, StockPoster p
     {
         var p = await LoadPaymentAsync(id, ct);
         EnsureDraft(p.Status);
+        p.Number = await numbers.NextAsync(SequenceKeys.SupplierPayment, ct);
         await EnsureSupplierAsync(p.SupplierId, ct);
         var paid = R4(p.Amount * p.ExchangeRate);
         await gl.PostAsync(SourceTypes.SupplierPayment, p.Id, p.Date, $"Supplier payment {p.Number}", ct,

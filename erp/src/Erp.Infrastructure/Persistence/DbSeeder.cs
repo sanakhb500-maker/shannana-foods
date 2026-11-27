@@ -76,9 +76,12 @@ public static class DbSeeder
         if (!await db.Currencies.AnyAsync(ct))
         {
             // The local currency is configurable; it can also be edited later from the UI.
-            var localCode = (cfg["Seed:LocalCurrencyCode"] ?? "JOD").ToUpperInvariant();
+            var localCode = (cfg["Seed:LocalCurrencyCode"] ?? "SYP").ToUpperInvariant();
+            var isSyp = localCode == "SYP";
             db.Currencies.AddRange(
-                new Currency { Code = localCode, NameAr = cfg["Seed:LocalCurrencyNameAr"] ?? "العملة المحلية", NameEn = cfg["Seed:LocalCurrencyNameEn"] ?? "Local currency", Symbol = localCode, IsLocal = true },
+                new Currency { Code = localCode, NameAr = cfg["Seed:LocalCurrencyNameAr"] ?? (isSyp ? "الليرة السورية الجديدة" : "العملة المحلية"),
+                    NameEn = cfg["Seed:LocalCurrencyNameEn"] ?? (isSyp ? "New Syrian pound" : "Local currency"),
+                    Symbol = isSyp ? "ل.س" : localCode, IsLocal = true },
                 new Currency { Code = "USD", NameAr = "دولار أمريكي", NameEn = "US Dollar", Symbol = "$", IsLocal = false });
         }
 
@@ -95,6 +98,11 @@ public static class DbSeeder
         await db.SaveChangesAsync(ct);
 
         await SeedChartOfAccountsAsync(db, ct);
+
+        foreach (var key in SequenceKeys.All)
+            if (!await db.DocumentSequences.AnyAsync(x => x.Key == key, ct))
+                db.DocumentSequences.Add(new DocumentSequence { Key = key });
+        await db.SaveChangesAsync(ct);
 
         if (!await userMgr.Users.AnyAsync(ct))
         {
